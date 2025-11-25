@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Hello-Expo-Client",
+    "slug": "hello-expo-client",
+    "sdkVersion": "54.0.0",
+    "platforms": ["android","ios","web"],
+    "version": "0.0.1"
+  }
+}
