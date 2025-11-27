@@ -14,11 +14,8 @@
     "assigneeId": { "type": ["string", "null"] },
     "subtaskIds": { "type": "array", "items": { "type": "string" } },
     "parentId": { "type": ["string", "null"] },
-    "planId": { "type": ["string", "null"] },
-    "order": { "type": "number" },
     "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": ["string", "null"], "format": "date-time" },
-    "metadata": { "type": ["object", "null"], "additionalProperties": true }
+    "updatedAt": { "type": ["string", "null"], "format": "date-time" }
   },
   "additionalProperties": true
 }

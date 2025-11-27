@@ -24,11 +24,8 @@ export interface Task {
   assigneeId?: ID;
   subtaskIds: ID[];
   parentId?: ID | null;
-  planId?: ID;
-  order?: number;
   createdAt: string; // ISO date-time
   updatedAt?: string; // ISO date-time
-  metadata?: Record<string, unknown>;
 }
 
 export default Task;

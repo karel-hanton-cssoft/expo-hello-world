@@ -19,7 +19,6 @@
       "authorId": "user:alice",
       "subtaskIds": ["task:book-train:check-discounts"],
       "parentId": "plan:family-trip-2025",
-      "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:05:00.000Z"
     },
     {
@@ -29,7 +28,6 @@
       "authorId": "user:alice",
       "parentId": "task:book-train",
       "subtaskIds": [],
-      "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:06:00.000Z"
     },
     {
@@ -40,7 +38,6 @@
       "authorId": "user:alice",
       "subtaskIds": ["task:buy-tickets:select-seats"],
       "parentId": "plan:family-trip-2025",
-      "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:10:00.000Z"
     },
     {
@@ -50,7 +47,6 @@
       "authorId": "user:alice",
       "parentId": "task:buy-tickets",
       "subtaskIds": [],
-      "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:11:00.000Z"
     },
     {
@@ -61,7 +57,6 @@
       "authorId": "user:alice",
       "subtaskIds": ["task:pack-bags:pack-clothes"],
       "parentId": "plan:family-trip-2025",
-      "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:20:00.000Z"
     },
     {
@@ -71,7 +66,6 @@
       "authorId": "user:alice",
       "subtaskIds": ["task:pack-bags:pack-clothes:pack-socks"],
       "parentId": "task:pack-bags",
-      "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:21:00.000Z"
     },
     {
@@ -81,7 +75,6 @@
       "authorId": "user:alice",
       "parentId": "task:pack-bags:pack-clothes",
       "subtaskIds": [],
-      "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:22:00.000Z"
     }
   ]
