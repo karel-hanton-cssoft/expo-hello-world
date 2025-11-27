@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test:examples:build": "tsc -p ./scripts/tsconfig.json --outDir ./dist/scripts",
+    "test:examples": "npm run test:examples:build && node ./dist/scripts/test-examples.js"
   },
   "dependencies": {
     "expo": "~54.0.0",
@@ -16,6 +18,9 @@
   "devDependencies": {
     "typescript": "~5.9.2",
     "@types/react": "~19.1.10",
-    "@types/react-native": "0.72.6"
+    "@types/react-native": "0.72.6",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "@types/node": "^20.5.0"
   }
 }

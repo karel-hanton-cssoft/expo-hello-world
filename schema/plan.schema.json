@@ -11,7 +11,7 @@
         "users": { "type": "array", "items": { "$ref": "./user.schema.json" } },
         "accessKey": { "type": "string" }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     }
   ]
 }

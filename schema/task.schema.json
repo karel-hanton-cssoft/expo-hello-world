@@ -20,5 +20,5 @@
     "updatedAt": { "type": ["string", "null"], "format": "date-time" },
     "metadata": { "type": ["object", "null"], "additionalProperties": true }
   },
-  "additionalProperties": false
+  "additionalProperties": true
 }
