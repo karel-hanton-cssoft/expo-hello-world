@@ -1,11 +1,79 @@
 {
-  "id": "plan:shopping:2025-01",
-  "title": "Supermarket trip",
-  "description": "Buy groceries for the week",
-  "status": "new",
-  "authorId": "user:alice",
-  "subtaskIds": ["task:milk", "task:bread", "task:vegetables"],
-  "users": [{ "id": "user:alice" }],
-  "createdAt": "2025-01-01T09:00:00.000Z",
-  "accessKey": "access:plan:shopping:2025-01"
-}
+  {
+    "plan": {
+      "id": "plan:shopping:2025-01",
+      "title": "Supermarket trip",
+      "description": "Buy groceries for the week",
+      "status": "new",
+      "authorId": "user:alice",
+      "subtaskIds": ["task:milk", "task:bread", "task:vegetables"],
+      "createdAt": "2025-01-01T09:00:00.000Z",
+      "accessKey": "access:plan:shopping:2025-01",
+      "users": [{ "id": "user:alice" }]
+    },
+    "tasks": [
+      {
+        "id": "task:milk",
+        "title": "Buy milk",
+        "description": "Whole milk + long-life option",
+        "status": "new",
+        "authorId": "user:alice",
+        "subtaskIds": ["task:milk:check-fat"],
+        "parentId": "plan:shopping:2025-01",
+        "planId": "plan:shopping:2025-01",
+        "createdAt": "2025-01-01T09:05:00.000Z"
+      },
+      {
+        "id": "task:milk:check-fat",
+        "title": "Check fat percentage",
+        "description": "Choose between skimmed, semi-skimmed or whole",
+        "status": "new",
+        "authorId": "user:alice",
+        "parentId": "task:milk",
+        "planId": "plan:shopping:2025-01",
+        "createdAt": "2025-01-01T09:06:00.000Z"
+      },
+      {
+        "id": "task:bread",
+        "title": "Buy bread",
+        "description": "Sourdough or seeded loaf",
+        "status": "new",
+        "authorId": "user:alice",
+        "subtaskIds": ["task:bread:choose-type"],
+        "parentId": "plan:shopping:2025-01",
+        "planId": "plan:shopping:2025-01",
+        "createdAt": "2025-01-01T09:10:00.000Z"
+      },
+      {
+        "id": "task:bread:choose-type",
+        "title": "Choose bread type",
+        "description": "Decide seeded or plain",
+        "status": "new",
+        "authorId": "user:alice",
+        "parentId": "task:bread",
+        "planId": "plan:shopping:2025-01",
+        "createdAt": "2025-01-01T09:11:00.000Z"
+      },
+      {
+        "id": "task:vegetables",
+        "title": "Buy vegetables",
+        "description": "Tomatoes, carrots, salad leaves",
+        "status": "new",
+        "authorId": "user:alice",
+        "subtaskIds": ["task:vegetables:wash-sample"],
+        "parentId": "plan:shopping:2025-01",
+        "planId": "plan:shopping:2025-01",
+        "createdAt": "2025-01-01T09:20:00.000Z"
+      },
+      {
+        "id": "task:vegetables:wash-sample",
+        "title": "Wash sample vegetables",
+        "description": "Quickly rinse a few vegetables to check freshness",
+        "status": "new",
+        "authorId": "user:alice",
+        "parentId": "task:vegetables",
+        "planId": "plan:shopping:2025-01",
+        "createdAt": "2025-01-01T09:21:00.000Z"
+      }
+    ]
+  }

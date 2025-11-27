@@ -1,11 +1,85 @@
 {
-  "id": "plan:family-trip-2025",
-  "title": "Family weekend trip",
-  "description": "Planning tasks for a short family trip",
-  "status": "in_progress",
-  "authorId": "user:alice",
-  "subtaskIds": ["task:book-train", "task:buy-tickets", "task:pack-bags"],
-  "users": [{ "id": "user:alice" }],
-  "createdAt": "2025-05-01T09:00:00.000Z",
-  "accessKey": "access:plan:family-trip-2025"
+  "plan": {
+    "id": "plan:family-trip-2025",
+    "title": "Family weekend trip",
+    "description": "Planning tasks for a short family trip",
+    "status": "in_progress",
+    "authorId": "user:alice",
+    "subtaskIds": ["task:book-train", "task:buy-tickets", "task:pack-bags"],
+    "createdAt": "2025-05-01T09:00:00.000Z",
+    "accessKey": "access:plan:family-trip-2025",
+    "users": [{ "id": "user:alice" }]
+  },
+  "tasks": [
+    {
+      "id": "task:book-train",
+      "title": "Book train tickets",
+      "description": "Find suitable train connections and times",
+      "status": "in_progress",
+      "authorId": "user:alice",
+      "subtaskIds": ["task:book-train:check-discounts"],
+      "parentId": "plan:family-trip-2025",
+      "planId": "plan:family-trip-2025",
+      "createdAt": "2025-05-01T09:05:00.000Z"
+    },
+    {
+      "id": "task:book-train:check-discounts",
+      "title": "Check discounts and promotions",
+      "status": "new",
+      "authorId": "user:alice",
+      "parentId": "task:book-train",
+      "planId": "plan:family-trip-2025",
+      "createdAt": "2025-05-01T09:06:00.000Z"
+    },
+    {
+      "id": "task:buy-tickets",
+      "title": "Purchase tickets",
+      "description": "Buy event tickets for the trip",
+      "status": "new",
+      "authorId": "user:alice",
+      "subtaskIds": ["task:buy-tickets:select-seats"],
+      "parentId": "plan:family-trip-2025",
+      "planId": "plan:family-trip-2025",
+      "createdAt": "2025-05-01T09:10:00.000Z"
+    },
+    {
+      "id": "task:buy-tickets:select-seats",
+      "title": "Select seats for tickets",
+      "status": "new",
+      "authorId": "user:alice",
+      "parentId": "task:buy-tickets",
+      "planId": "plan:family-trip-2025",
+      "createdAt": "2025-05-01T09:11:00.000Z"
+    },
+    {
+      "id": "task:pack-bags",
+      "title": "Pack bags",
+      "description": "Pack clothes and essentials",
+      "status": "in_progress",
+      "authorId": "user:alice",
+      "subtaskIds": ["task:pack-bags:pack-clothes"],
+      "parentId": "plan:family-trip-2025",
+      "planId": "plan:family-trip-2025",
+      "createdAt": "2025-05-01T09:20:00.000Z"
+    },
+    {
+      "id": "task:pack-bags:pack-clothes",
+      "title": "Pack clothes",
+      "status": "in_progress",
+      "authorId": "user:alice",
+      "subtaskIds": ["task:pack-bags:pack-clothes:pack-socks"],
+      "parentId": "task:pack-bags",
+      "planId": "plan:family-trip-2025",
+      "createdAt": "2025-05-01T09:21:00.000Z"
+    },
+    {
+      "id": "task:pack-bags:pack-clothes:pack-socks",
+      "title": "Pack socks",
+      "status": "new",
+      "authorId": "user:alice",
+      "parentId": "task:pack-bags:pack-clothes",
+      "planId": "plan:family-trip-2025",
+      "createdAt": "2025-05-01T09:22:00.000Z"
+    }
+  ]
 }
