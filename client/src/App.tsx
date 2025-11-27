@@ -95,17 +95,22 @@ function TaskNode({ id, byId, level }: { id: string; byId: Map<string, Task>; le
   const children = task.subtaskIds ?? [];
 
   return (
-    <View style={{ marginVertical: 6 }}>
-      <Pressable onPress={() => setOpen((s) => !s)} style={[styles.nodeRow, { paddingLeft: level * 12 }]}>
+    <View style={{ marginVertical: 8 }}>
+      <Pressable
+        onPress={() => setOpen((s) => !s)}
+        style={[styles.nodeRow, { paddingLeft: level * 14 }]}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityRole="button"
+      >
         <Text style={styles.nodeTitle}>{open ? '▾' : '▸'} {task.title}</Text>
         <Text style={styles.nodeStatus}>{task.status}</Text>
       </Pressable>
       {open && (
         <View>
-          <View style={{ paddingLeft: 12 }}>
-            <Text style={styles.nodeMeta}>id: {task.id}</Text>
-            {task.description ? <Text style={styles.nodeMeta}>{task.description}</Text> : null}
-          </View>
+          <View style={{ paddingLeft: 14, paddingVertical: 6 }}>
+              <Text style={styles.nodeMeta}>id: {task.id}</Text>
+              {task.description ? <Text style={styles.nodeMeta}>{task.description}</Text> : null}
+            </View>
           {children.map((c) => (
             <TaskNode key={c} id={c} byId={byId} level={level + 1} />
           ))}
@@ -135,9 +140,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '700', marginTop: 12, marginBottom: 6 },
   jsonBox: { backgroundColor: '#12121205', padding: 8, borderRadius: 6 },
   mono: { fontFamily: 'monospace', fontSize: 12, color: '#222' },
-
-  nodeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  nodeTitle: { fontSize: 14 },
-  nodeStatus: { fontSize: 11, color: '#666' },
-  nodeMeta: { fontSize: 11, color: '#444' },
+  nodeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, paddingRight: 8 },
+  nodeTitle: { fontSize: 15, lineHeight: 20 },
+  nodeStatus: { fontSize: 12, color: '#666' },
+  nodeMeta: { fontSize: 12, color: '#444', marginBottom: 4 },
 });
