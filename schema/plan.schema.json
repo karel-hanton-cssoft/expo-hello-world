@@ -8,7 +8,7 @@
       "type": "object",
       "required": ["accessKey"],
       "properties": {
-        "users": { "type": "array", "items": { "type": "string" } },
+        "users": { "type": "array", "items": { "$ref": "./user.schema.json" } },
         "accessKey": { "type": "string" }
       },
       "additionalProperties": false

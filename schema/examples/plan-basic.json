@@ -5,6 +5,7 @@
   "status": "new",
   "authorId": "user:alice",
   "subtaskIds": ["task:milk", "task:bread", "task:vegetables"],
+  "users": [{ "id": "user:alice" }],
   "createdAt": "2025-01-01T09:00:00.000Z",
   "accessKey": "access:plan:shopping:2025-01"
 }
