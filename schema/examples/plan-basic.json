@@ -1,0 +1,10 @@
+{
+  "id": "plan:shopping:2025-01",
+  "title": "Supermarket trip",
+  "description": "Buy groceries for the week",
+  "status": "new",
+  "authorId": "user:alice",
+  "subtaskIds": ["task:milk", "task:bread", "task:vegetables"],
+  "createdAt": "2025-01-01T09:00:00.000Z",
+  "accessKey": "access:plan:shopping:2025-01"
+}

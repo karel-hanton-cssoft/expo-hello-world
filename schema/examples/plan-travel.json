@@ -1,0 +1,10 @@
+{
+  "id": "plan:family-trip-2025",
+  "title": "Family weekend trip",
+  "description": "Planning tasks for a short family trip",
+  "status": "in_progress",
+  "authorId": "user:alice",
+  "subtaskIds": ["task:book-train", "task:buy-tickets", "task:pack-bags"],
+  "createdAt": "2025-05-01T09:00:00.000Z",
+  "accessKey": "access:plan:family-trip-2025"
+}

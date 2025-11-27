@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/task.schema.json",
+  "title": "Task",
+  "type": "object",
+  "required": ["id", "title", "status", "authorId", "createdAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": ["string", "null"] },
+    "result": { "type": ["string", "null"] },
+    "status": { "type": "string", "enum": ["new", "in_progress", "automatic", "done"] },
+    "authorId": { "type": "string" },
+    "assigneeId": { "type": ["string", "null"] },
+    "subtaskIds": { "type": "array", "items": { "type": "string" } },
+    "parentId": { "type": ["string", "null"] },
+    "planId": { "type": ["string", "null"] },
+    "order": { "type": "number" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": ["string", "null"], "format": "date-time" },
+    "metadata": { "type": ["object", "null"], "additionalProperties": true }
+  },
+  "additionalProperties": false
+}
