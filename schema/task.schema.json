@@ -3,7 +3,7 @@
   "$id": "https://example.com/schemas/task.schema.json",
   "title": "Task",
   "type": "object",
-  "required": ["id", "title", "status", "authorId", "createdAt"],
+  "required": ["id", "title", "status", "authorId", "createdAt", "subtaskIds"],
   "properties": {
     "id": { "type": "string" },
     "title": { "type": "string", "minLength": 1 },

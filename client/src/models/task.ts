@@ -22,7 +22,7 @@ export interface Task {
   status: TaskStatus;
   authorId: ID;
   assigneeId?: ID;
-  subtaskIds?: ID[];
+  subtaskIds: ID[];
   parentId?: ID | null;
   planId?: ID;
   order?: number;

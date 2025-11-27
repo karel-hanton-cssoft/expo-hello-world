@@ -28,6 +28,7 @@
       "status": "new",
       "authorId": "user:alice",
       "parentId": "task:book-train",
+      "subtaskIds": [],
       "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:06:00.000Z"
     },
@@ -48,6 +49,7 @@
       "status": "new",
       "authorId": "user:alice",
       "parentId": "task:buy-tickets",
+      "subtaskIds": [],
       "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:11:00.000Z"
     },
@@ -78,6 +80,7 @@
       "status": "new",
       "authorId": "user:alice",
       "parentId": "task:pack-bags:pack-clothes",
+      "subtaskIds": [],
       "planId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:22:00.000Z"
     }

@@ -1,5 +1,4 @@
 {
-  {
     "plan": {
       "id": "plan:shopping:2025-01",
       "title": "Supermarket trip",
@@ -30,6 +29,7 @@
         "status": "new",
         "authorId": "user:alice",
         "parentId": "task:milk",
+        "subtaskIds": [],
         "planId": "plan:shopping:2025-01",
         "createdAt": "2025-01-01T09:06:00.000Z"
       },
@@ -51,6 +51,7 @@
         "status": "new",
         "authorId": "user:alice",
         "parentId": "task:bread",
+        "subtaskIds": [],
         "planId": "plan:shopping:2025-01",
         "createdAt": "2025-01-01T09:11:00.000Z"
       },
@@ -72,8 +73,9 @@
         "status": "new",
         "authorId": "user:alice",
         "parentId": "task:vegetables",
+        "subtaskIds": [],
         "planId": "plan:shopping:2025-01",
         "createdAt": "2025-01-01T09:21:00.000Z"
       }
     ]
-  }
+}

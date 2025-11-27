@@ -6,7 +6,7 @@
     { "$ref": "./task.schema.json" },
     {
       "type": "object",
-      "required": ["accessKey"],
+      "required": ["accessKey", "users"],
       "properties": {
         "users": { "type": "array", "items": { "$ref": "./user.schema.json" } },
         "accessKey": { "type": "string" }
