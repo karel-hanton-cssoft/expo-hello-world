@@ -9,12 +9,16 @@ import {
   SafeAreaView,
 } from 'react-native';
 import EXAMPLE_PLANS from './data/examples';
+import * as api from './api';
 import type { Task, Plan } from './models';
 
 type ExamplePlan = { plan: Plan; tasks: Task[] };
 
 export default function App() {
   const [selected, setSelected] = useState<ExamplePlan | null>(null);
+  const [plans, setPlans] = useState<ExamplePlan[]>(EXAMPLE_PLANS as ExamplePlan[]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   function handleOpen(p: ExamplePlan) {
     setSelected(p);
@@ -23,25 +27,61 @@ export default function App() {
   function handleClose() {
     setSelected(null);
   }
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const tasks = await api.fetchAllTasks(1000);
+        const grouped = api.groupIntoPlans(tasks);
+        if (mounted) setPlans(grouped as ExamplePlan[]);
+      } catch (err: any) {
+        console.warn('Failed to fetch remote tasks, falling back to examples', err);
+        setError(String(err?.message || err));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Developer — Example Plans</Text>
-      <Text style={styles.body}>Tap a plan to inspect its tasks.</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.body}>Tap a plan to inspect its tasks.</Text>
+        <Pressable onPress={async () => { setLoading(true); setError(null); try { const tasks = await api.fetchAllTasks(1000); setPlans(api.groupIntoPlans(tasks) as ExamplePlan[]); } catch (e: any) { setError(String(e?.message || e)); setPlans(EXAMPLE_PLANS as ExamplePlan[]); } finally { setLoading(false); } }} style={styles.refreshButton}>
+          <Text style={styles.refreshText}>Refresh</Text>
+        </Pressable>
+      </View>
 
-      <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 32 }}>
-        {EXAMPLE_PLANS.map((ex: any, idx: number) => (
-          <Pressable
-            key={idx}
-            style={({ pressed }) => [styles.planButton, pressed && styles.planButtonPressed]}
-            accessibilityRole="button"
-            accessibilityLabel={`Open plan ${ex.plan.title}`}
-            onPress={() => handleOpen(ex)}
-          >
-            <Text style={styles.planTitle}>{ex.plan.title}</Text>
-            <Text style={styles.planMeta}>{ex.plan.description}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <Text style={{ textAlign: 'center', marginTop: 20 }}>Loading plans...</Text>
+        ) : error ? (
+          <View style={{ padding: 12 }}>
+            <Text style={{ color: 'crimson' }}>Failed to load remote plans: {error}</Text>
+            <Text style={{ marginTop: 8 }}>Showing local examples instead.</Text>
+            <Text style={styles.localBadge}>LOCAL</Text>
+          </View>
+        ) : null}
+
+        <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 32 }}>
+          {plans.map((ex: any, idx: number) => (
+            <Pressable
+              key={idx}
+              style={({ pressed }) => [styles.planButton, pressed && styles.planButtonPressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`Open plan ${ex.plan.title}`}
+              onPress={() => handleOpen(ex)}
+            >
+              <Text style={styles.planTitle}>{ex.plan.title}</Text>
+              <Text style={styles.planMeta}>{ex.plan.description}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
       <Modal visible={!!selected} animationType="slide" onRequestClose={handleClose}>
         {selected && (
@@ -144,4 +184,8 @@ const styles = StyleSheet.create({
   nodeTitle: { fontSize: 15, lineHeight: 20 },
   nodeStatus: { fontSize: 12, color: '#666' },
   nodeMeta: { fontSize: 12, color: '#444', marginBottom: 4 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+  refreshButton: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  refreshText: { color: 'white', fontWeight: '700' },
+  localBadge: { color: 'white', backgroundColor: 'crimson', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', marginTop: 8 },
 });
