@@ -1,0 +1,252 @@
+openapi: 3.1.0
+info:
+  title: Task Model API
+  version: '1.0.0'
+  description: |
+    Minimal RESTful API for the Task model. In this API a Plan is represented as a Task (no separate Plan type).
+    This spec follows the task-model prompt and exposes CRUD operations for Task resources.
+
+servers:
+  - url: https://api.example.com/v1
+
+paths:
+  /tasks:
+    get:
+      summary: List Tasks
+      description: Return a paginated list of tasks. Tasks include Plans (top-level tasks) and child tasks.
+      parameters:
+        - name: parentId
+          in: query
+          schema:
+            type: string
+          description: Filter tasks by parent task id
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: A list of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  total:
+                    type: integer
+              examples:
+                plan-basic-sample:
+                  summary: Basic plan with tasks
+                  value:
+                    items:
+                                      id: plan:shopping:2025-01
+                                      title: Supermarket trip
+                                      description: Buy groceries for the week
+                                      status: new
+                                      authorId: user:alice
+                                      subtaskIds: [task:milk, task:bread, task:vegetables]
+                                      createdAt: '2025-01-01T09:00:00.000Z'
+                                      users: [{ id: user:alice }]
+                      - id: task:milk
+                        title: Buy milk
+                        parentId: plan:shopping:2025-01
+                        subtaskIds: [task:milk:check-fat]
+                        createdAt: '2025-01-01T09:05:00.000Z'
+                      - id: task:milk:check-fat
+                        title: Check fat percentage
+                        parentId: task:milk
+                        subtaskIds: []
+                        createdAt: '2025-01-01T09:06:00.000Z'
+                    total: 6
+      post: 
+      summary: Create Task
+      description: Create a new task. Use `parentId` to attach as a subtask; omit to create a top-level plan task.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+            examples:
+              create-sample:
+                summary: Create a grocery task
+                value:
+                  title: "Buy eggs"
+                  description: "Free-range eggs, a dozen"
+                  authorId: "user:alice"
+                  parentId: "plan:shopping:2025-01"
+      responses:
+        '201':
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              examples:
+                created-sample:
+                  summary: Created task response
+                  value:
+                    id: task:eggs
+                    title: Buy eggs
+                    description: Free-range eggs, a dozen
+                    status: new
+                    authorId: user:alice
+                    parentId: plan:shopping:2025-01
+                    subtaskIds: []
+                    createdAt: '2025-01-01T09:30:00.000Z'
+
+  /tasks/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get Task
+      responses:
+        '200':
+          description: Task found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: Not found
+    put:
+      summary: Update Task
+      description: Replace or update fields of a task.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: Not found
+    delete:
+      summary: Delete Task
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+
+components:
+  schemas:
+    ID:
+      type: string
+      description: Unique identifier for resources
+
+    User:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/ID'
+      required: [id]
+
+    TaskBase:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/ID'
+        title:
+          type: string
+        description:
+          type: string
+        result:
+          type: string
+        status:
+          type: string
+          description: Small status string (todo|in-progress|done|etc.)
+        authorId:
+          $ref: '#/components/schemas/ID'
+        assigneeId:
+          $ref: '#/components/schemas/ID'
+        subtaskIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/ID'
+        parentId:
+          $ref: '#/components/schemas/ID'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        
+      required: [id, title, authorId, subtaskIds, createdAt]
+
+    Task:
+      allOf:
+        - $ref: '#/components/schemas/TaskBase'
+        - type: object
+          properties:
+            users:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+            accessKey:
+              type: string
+
+    TaskCreate:
+      type: object
+      properties:
+        authorId:
+          $ref: '#/components/schemas/ID'
+        assigneeId:
+          $ref: '#/components/schemas/ID'
+        parentId:
+          $ref: '#/components/schemas/ID'
+        title:
+          type: string
+        description:
+          type: string
+        
+      required: [title, authorId]
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        result:
+          type: string
+        status:
+          type: string
+        assigneeId:
+          $ref: '#/components/schemas/ID'
+        subtaskIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/ID'
+        
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []

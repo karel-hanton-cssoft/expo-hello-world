@@ -8,7 +8,7 @@ tags: ["project","rules"]
 
 Context:
 - Projekt: klientská mobilní aplikace (Expo SDK 54, TypeScript, React Native).
-- Purpose: light household task manager (not an enterprise system). High-level domain model (tasks, plans, shares) and specific UI flows live in area prompts (`task-model.md`, `client-ui.md`).
+- Purpose: light household task manager - not an enterprise system (UI and logic inspiration: Settle Up). High-level domain model (tasks, plans, shares) and specific UI flows live in area prompts (`task-model.md`, `client-ui.md`).
 
 Core rules (enforced):
 1. Každý generovaný kus kódu má obsahovat TypeScript typy a jednoduché unit testy (když je to relevantní).
