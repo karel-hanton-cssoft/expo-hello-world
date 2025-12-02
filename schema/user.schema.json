@@ -2,10 +2,36 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/schemas/user.schema.json",
   "title": "User",
+  "description": "User represents a plan participant. No authentication or global identity - users are per-plan labels only.",
   "type": "object",
-  "required": ["id"],
+  "required": ["id", "displayName"],
   "properties": {
-    "id": { "type": "string" }
+    "id": {
+      "type": "string",
+      "description": "Unique identifier (e.g. UUID) - cross-system unique"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Display name shown in UI",
+      "minLength": 1
+    },
+    "firstName": {
+      "type": "string",
+      "description": "Optional first name for full name display"
+    },
+    "lastName": {
+      "type": "string",
+      "description": "Optional last name for full name display"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Optional email for contact/sharing (not globally unique)"
+    },
+    "phoneNumber": {
+      "type": "string",
+      "description": "Optional phone number for contact/sharing"
+    }
   },
   "additionalProperties": false
 }

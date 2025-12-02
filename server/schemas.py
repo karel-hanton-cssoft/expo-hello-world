@@ -1,11 +1,17 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 
 # Simple alias for identifier strings
 ID = str
 
 class User(BaseModel):
+    """User represents a plan participant. No authentication - users are per-plan labels only."""
     id: ID
+    displayName: str = Field(..., min_length=1, description="Display name shown in UI")
+    firstName: Optional[str] = Field(None, description="Optional first name for full name display")
+    lastName: Optional[str] = Field(None, description="Optional last name for full name display")
+    email: Optional[EmailStr] = Field(None, description="Optional email for contact/sharing (not globally unique)")
+    phoneNumber: Optional[str] = Field(None, description="Optional phone number for contact/sharing")
 
 class TaskBase(BaseModel):
     id: ID

@@ -26,10 +26,22 @@ Initialize database and import examples
 # from repo root
 cd /path/to/expo-hello-world
 # initialize SQLite file and schema
-server/.venv/bin/python -c "from server import db; db.init_db()"
+.venv/bin/python -c "from server import db; db.init_db()"
 
 # import example plans/tasks into the DB
-server/.venv/bin/python server/import_examples.py
+.venv/bin/python server/import_examples.py
+# Import without deleting
+.venv/bin/python -m server.import_examples
+
+# Delete all tasks and import fresh examples
+.venv/bin/python -m server.import_examples --delete-all-before
+```
+
+Deploy to remote server
+
+```bash
+# from repo root - copy server and schema directories to remote host
+scp -r server/ schema/ targettrace@targettrace.cz:~/work/just-plan-it/
 ```
 
 Run the server
@@ -37,7 +49,7 @@ Run the server
 ```bash
 # from repo root (recommended)
 cd /path/to/expo-hello-world
-server/.venv/bin/python -m uvicorn server.main:app --reload --port 8000
+server/.venv/bin/python -m uvicorn server.main:app --reload --host 0.0.0.0 --port 8123
 ```
 
 Notes
