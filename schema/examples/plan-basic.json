@@ -8,7 +8,16 @@
       "subtaskIds": ["task:milk", "task:bread", "task:vegetables"],
       "createdAt": "2025-01-01T09:00:00.000Z",
       "accessKey": "access:plan:shopping:2025-01",
-      "users": [{ "id": "user:alice" }]
+      "users": [
+        {
+          "id": "user:alice",
+          "displayName": "Alice",
+          "firstName": "Alice",
+          "lastName": "Johnson",
+          "email": "alice.johnson@example.com",
+          "phoneNumber": "+420 777 123 456"
+        }
+      ]
     },
     "tasks": [
       {
