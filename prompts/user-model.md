@@ -26,7 +26,7 @@ User (requirements)
   - firstName: string - optional; just to have full name
   - lastName: string - optional; just to have full name
   - email: string - optional; only support information to share accessKey sharing
-  - phoneNumber: string - optinal; only support information to share accessKey sharing
+  - phoneNumber: string - optional; only support information to share accessKey sharing
 
 Users Store
   - **Plan Users:** Each Plan has isolated list of users (Plan.users array). No shared user registry across plans.
@@ -50,6 +50,7 @@ Required outputs (format & versions)
 - Server: update `User` on Python server if needed
 - OpenAPI: Update Plan schema in `docs/openapi/task.yaml` to reflect full User structure (no new endpoints).
   - no OpenAPI for `User`, users are part of Plan - covered by Task OpenAPI endpoint
+- helper function `generateUserId(): string` - generates User ID string based on data requirements
 
 Acceptance criteria (testable)
 - TypeScript interface must compile under TypeScript strict mode.
