@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   Text,
   View,
@@ -7,6 +7,10 @@ import {
   Modal,
   ScrollView,
   SafeAreaView,
+  FlatList,
+  Dimensions,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import EXAMPLE_PLANS from './data/examples';
 import * as api from './api';
@@ -14,11 +18,16 @@ import type { Task, Plan } from './models';
 
 type ExamplePlan = { plan: Plan; tasks: Task[] };
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+
 export default function App() {
   const [selected, setSelected] = useState<ExamplePlan | null>(null);
   const [plans, setPlans] = useState<ExamplePlan[]>(EXAMPLE_PLANS as ExamplePlan[]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const flatListRef = useRef<FlatList>(null);
 
   function handleOpen(p: ExamplePlan) {
     setSelected(p);
@@ -46,42 +55,114 @@ export default function App() {
       mounted = false;
     };
   }, []);
-  return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Developer — Example Plans</Text>
-      <View style={styles.headerRow}>
-        <Text style={styles.body}>Tap a plan to inspect its tasks.</Text>
-        <Pressable onPress={async () => { setLoading(true); setError(null); try { const tasks = await api.fetchAllTasks(1000); setPlans(api.groupIntoPlans(tasks) as ExamplePlan[]); } catch (e: any) { setError(String(e?.message || e)); setPlans(EXAMPLE_PLANS as ExamplePlan[]); } finally { setLoading(false); } }} style={styles.refreshButton}>
-          <Text style={styles.refreshText}>Refresh</Text>
-        </Pressable>
-      </View>
 
-      <View style={{ flex: 1 }}>
-        {loading ? (
-          <Text style={{ textAlign: 'center', marginTop: 20 }}>Loading plans...</Text>
-        ) : error ? (
-          <View style={{ padding: 12 }}>
-            <Text style={{ color: 'crimson' }}>Failed to load remote plans: {error}</Text>
-            <Text style={{ marginTop: 8 }}>Showing local examples instead.</Text>
+  // Create screens array: plans + Create Plan Screen
+  const screens = [...plans, { isCreateScreen: true }];
+
+  const renderScreen = ({ item, index }: { item: any; index: number }) => {
+    if (item.isCreateScreen) {
+      // Create Plan Screen
+      return (
+        <View style={[styles.screenContainer, { width: SCREEN_WIDTH }]}>
+          <View style={styles.createPlanScreen}>
+            <Text style={styles.createPlanIcon}>+</Text>
+            <Text style={styles.createPlanText}>Create new Plan</Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Plan Screen
+    const plan = item as ExamplePlan;
+    return (
+      <View style={[styles.screenContainer, { width: SCREEN_WIDTH }]}>
+        <View style={styles.planScreen}>
+          <View style={styles.planHeader}>
+            <Text style={styles.planHeaderTitle}>{plan.plan.title}</Text>
+            <Text style={styles.planHeaderSubtitle}>{plan.plan.description}</Text>
+          </View>
+          <Pressable
+            style={styles.planButton}
+            onPress={() => handleOpen(plan)}
+          >
+            <Text style={styles.planButtonText}>View Details</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      setCurrentIndex(viewableItems[0].index || 0);
+    }
+  }).current;
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+        <Text style={styles.loadingText}>Loading plans...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      
+      {/* Floating header - positioned below status bar */}
+      <View style={[styles.floatingHeader, { top: STATUS_BAR_HEIGHT }]}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Plans ({currentIndex + 1}/{screens.length})</Text>
+          <Pressable
+            onPress={async () => {
+              setLoading(true);
+              setError(null);
+              try {
+                const tasks = await api.fetchAllTasks(1000);
+                setPlans(api.groupIntoPlans(tasks) as ExamplePlan[]);
+              } catch (e: any) {
+                setError(String(e?.message || e));
+                setPlans(EXAMPLE_PLANS as ExamplePlan[]);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            style={styles.refreshButton}
+          >
+            <Text style={styles.refreshText}>Refresh</Text>
+          </Pressable>
+        </View>
+
+        {error && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>Using local data</Text>
             <Text style={styles.localBadge}>LOCAL</Text>
           </View>
-        ) : null}
-
-        <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 32 }}>
-          {plans.map((ex: any, idx: number) => (
-            <Pressable
-              key={idx}
-              style={({ pressed }) => [styles.planButton, pressed && styles.planButtonPressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`Open plan ${ex.plan.title}`}
-              onPress={() => handleOpen(ex)}
-            >
-              <Text style={styles.planTitle}>{ex.plan.title}</Text>
-              <Text style={styles.planMeta}>{ex.plan.description}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        )}
       </View>
+
+      <FlatList
+        ref={flatListRef}
+        data={screens}
+        renderItem={renderScreen}
+        keyExtractor={(item, index) =>
+          item.isCreateScreen ? 'create-screen' : item.plan.id
+        }
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={{
+          itemVisiblePercentThreshold: 50,
+        }}
+        getItemLayout={(data, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
+      />
 
       <Modal visible={!!selected} animationType="slide" onRequestClose={handleClose}>
         {selected && (
@@ -105,7 +186,7 @@ export default function App() {
           </SafeAreaView>
         )}
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -161,31 +242,157 @@ function TaskNode({ id, byId, level }: { id: string; byId: Map<string, Task>; le
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 12 },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: 4, textAlign: 'center' },
-  body: { fontSize: 14, color: '#444', textAlign: 'center', marginBottom: 12 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#fff' 
+  },
+  
+  floatingHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  
+  title: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    textAlign: 'center' 
+  },
+  loadingText: { 
+    fontSize: 16, 
+    textAlign: 'center', 
+    marginTop: 100 
+  },
+  
+  headerRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  refreshButton: { 
+    backgroundColor: '#007AFF', 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 6 
+  },
+  refreshText: { color: 'white', fontWeight: '700', fontSize: 14 },
 
-  list: { flex: 1, width: '100%' },
-  planButton: { backgroundColor: '#f5f5f5', padding: 12, marginBottom: 8, borderRadius: 8 },
-  planButtonPressed: { backgroundColor: '#e6e6e6' },
-  planTitle: { fontWeight: '700', fontSize: 16 },
-  planMeta: { fontSize: 12, color: '#666', marginTop: 4 },
+  errorBanner: {
+    backgroundColor: '#fff3cd',
+    padding: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  errorText: { fontSize: 12, color: '#856404' },
+  localBadge: { 
+    color: 'white', 
+    backgroundColor: 'crimson', 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 4,
+    fontSize: 12,
+    fontWeight: '700'
+  },
 
-  modalContainer: { flex: 1, padding: 12 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  screenContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Create Plan Screen styles
+  createPlanScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    width: '100%'
+  },
+  createPlanIcon: {
+    fontSize: 80,
+    color: '#007AFF',
+    marginBottom: 16
+  },
+  createPlanText: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '600'
+  },
+
+  // Plan Screen styles
+  planScreen: {
+    flex: 1,
+    width: '100%',
+    paddingTop: 106,
+    padding: 16,
+    backgroundColor: '#fff'
+  },
+  planHeader: {
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF'
+  },
+  planHeaderTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 8
+  },
+  planHeaderSubtitle: {
+    fontSize: 16,
+    color: '#666'
+  },
+  planButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  planButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700'
+  },
+
+  // Modal styles
+  modalContainer: { flex: 1, padding: 12, backgroundColor: '#fff' },
+  modalHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    marginBottom: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0'
+  },
   modalTitle: { fontSize: 18, fontWeight: '700' },
   closeButton: { padding: 8, borderRadius: 6, backgroundColor: '#eee' },
   closeText: { fontWeight: '600' },
   modalBody: { flex: 1 },
   sectionTitle: { fontSize: 14, fontWeight: '700', marginTop: 12, marginBottom: 6 },
-  jsonBox: { backgroundColor: '#12121205', padding: 8, borderRadius: 6 },
-  mono: { fontFamily: 'monospace', fontSize: 12, color: '#222' },
-  nodeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, paddingRight: 8 },
-  nodeTitle: { fontSize: 15, lineHeight: 20 },
-  nodeStatus: { fontSize: 12, color: '#666' },
+  jsonBox: { backgroundColor: '#f5f5f5', padding: 8, borderRadius: 6, marginBottom: 16 },
+  mono: { fontFamily: 'monospace', fontSize: 11, color: '#222' },
+  
+  // Task tree styles
+  nodeRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingVertical: 8, 
+    paddingRight: 8 
+  },
+  nodeTitle: { fontSize: 15, lineHeight: 20, flex: 1 },
+  nodeStatus: { fontSize: 12, color: '#666', marginLeft: 8 },
   nodeMeta: { fontSize: 12, color: '#444', marginBottom: 4 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
-  refreshButton: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  refreshText: { color: 'white', fontWeight: '700' },
-  localBadge: { color: 'white', backgroundColor: 'crimson', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', marginTop: 8 },
 });
