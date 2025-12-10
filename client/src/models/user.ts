@@ -8,12 +8,10 @@ export type ID = string;
 
 /**
  * User represents a person in a plan.
- * Users exist only within Plan context (Plan.users array) - no global registry.
+ * Users exist only within Plan context (Plan.users dictionary) - no global registry.
+ * User ID is NOT part of this structure - it's the dictionary key in Plan.users.
  */
 export interface User {
-  /** Unique identifier (e.g. UUID) - cross-system unique */
-  id: ID;
-
   /** Display name shown in UI */
   displayName: string;
 
@@ -28,19 +26,6 @@ export interface User {
 
   /** Optional phone number for contact/sharing */
   phoneNumber?: string;
-}
-
-/**
- * Generate User ID using crypto.randomUUID() or similar.
- * Returns string like "550e8400-e29b-41d4-a716-446655440000".
- */
-export function generateUserId(): string {
-  // React Native doesn't have crypto.randomUUID(), use fallback
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }
 
 export default User;

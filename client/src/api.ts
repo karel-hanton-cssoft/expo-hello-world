@@ -35,4 +35,27 @@ export function groupIntoPlans(tasks: Task[]) {
   return roots.map((r) => ({ plan: r, tasks: [r, ...collectDescendants(r)] }));
 }
 
-export default { fetchAllTasks, groupIntoPlans };
+/**
+ * Post a new task/plan to the server.
+ * @param task - Task or Plan object to create on server
+ * @returns Created task from server
+ */
+export async function postTask(task: Task): Promise<Task> {
+  const url = `${SERVER}/tasks`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(task),
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error');
+    throw new Error(`POST task failed: ${res.status} - ${errorText}`);
+  }
+  
+  return await res.json() as Task;
+}
+
+export default { fetchAllTasks, groupIntoPlans, postTask };

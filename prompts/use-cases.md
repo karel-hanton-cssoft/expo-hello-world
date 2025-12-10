@@ -130,76 +130,99 @@ This document defines high-level user workflows for the Just Plan It application
 
 ---
 
-## UC-03: Plans Management
+## UC-03: Create New Plan
 
 **Actor:** User
 
 **Precondition:** 
 - App initialized (UC-01 completed)
 - User has getDefaultUser() profile
-- Zero (A) or more (B) plans exist in app:plans
+- Zero or more plans exist in app:plans
 
 **Main Flow:**
 
-**Initial State (No Plans):**
-1. App is in main operational state Plans Display after UC-01 (User see the main screen)
-2. App displays:
-   A) single screen: "Create Plan Screen"
-      - Large pushable "+" icon in center
-      - Text: "Create new Plan"
-   B) first App Plan Screen
-3. User swipes left/right - no other screens available
+**Initial State:**
+1. User is on any Plan Screen or on Create Plan Screen (accessible by swiping to last screen)
 
-**Creating First Plan:**
-4. User taps "+" on Create Plan Screen
-5. App prompts: "Plan name?" (default: "New Plan")
-6. User enters plan name (e.g., "Shopping")
-7. User taps "Create"
-8. App generates new plan:
-   - `planId = generateUserId()` (reusing UUID generator)
-   - `accessKey = generateAccessKey()`
-   - `title = "Shopping"`
-   - `status = "new"`
-   - `authorId = defaultUser.id`
-   - `subtaskIds = []`
-   - `users = [defaultUser]` (full User object)
-   - `createdAt = now()`
-9. App saves plan locally:
-   - POST plan to server (background)
-   - On success: save to AsyncStorage via `addPlan(planId, accessKey, defaultUser.id)`
-   - On failure: queue for retry, still save locally
-10. App navigates to new Plan Screen (shows plan details)
-11. Create Plan Screen is now accessible by swiping right (always last)
+**Creating New Plan:**
+1. User triggers plan creation by one of:
+   - **Option A:** Swipe to Create Plan Screen and tap large "+" button
+   - **Option B:** Select "Create New Plan" from Global Menu (see `app-ui.md`)
+2. App generates new plan structure:
+   - Basic fields:
+     - `id = generateTaskId()` (generates UUID for plan)
+     - `accessKey = generateAccessKey()` (UUID for sharing)
+     - `title = "My Plan"` (default, user will edit)
+     - `status = "new"` (TaskStatus.NEW)
+     - `assigneeId = undefined`
+     - `subtaskIds = []` (empty, tasks added later via UC-04)
+     - `createdAt = new Date().toISOString()`
+     - `updatedAt = undefined`
+   - Setup "me" user:
+     - `defaultUser = getDefaultUser()` get default user (displayName, email, etc.)
+     - `users = {}` create empty users dictionary 
+     - `meUserId = getUniqueUserId(users)` generate user ID → returns "user-1"
+     - `users[meUserId] = defaultUser` add "me" user to dictionary
+     - `authorId = meUserId` set "me" as author of this Plan
 
-**Navigation Between Plans:**
-12. User swipes left: moves to next plan (or Create Plan Screen if last)
-13. User swipes right: moves to previous plan
-14. Order: Plans in order from app:plans array, Create Plan Screen always last
-15. App displays current plan: header with name, tasks list, action buttons
-
-**Creating Additional Plans:**
-16. User swipes to Create Plan Screen (last screen, always available)
-17. User taps "+" and repeats steps 5-10
-18. New plan inserted before Create Plan Screen in swipe order
+3. App shows "New Plan" dialog with editable fields:
+   - **Title:** text input (pre-filled "My Plan", user can change)
+   - **Description:** text area (optional)
+   - **Buttons:**
+     - `CANCEL` - dismisses dialog, nothing saved
+     - `CREATE` - validates and creates plan
+4. If user taps `CANCEL`:
+   - Dialog closes, no plan created, use case ends
+5. If user taps `CREATE`:
+   - **Validation:** Title must not be empty
+   - **Validation:** Title should be unique among existing plans (warn if duplicate, allow creation with User confirmation)
+   - App saves plan locally and remotely:
+     - Call `addPlan(planId, accessKey, meUserId)` → updates `app:plans`, stores `plan:{id}:accessKey`, `plan:{id}:meUserId`
+     - POST plan to server as Task object (background, includes `users` dictionary)
+     - On server success: plan marked as synced
+     - On server failure: plan queued for retry, "Offline" indicator shown
+6. App closes the Plan Dialog and:
+   - Plan is added to FlatList `app:plans` with assigned index
+   - App moves to Plan Screen of this new plan
+   - User sees screen with newly created empty plan
+7. Create Plan Screen remains accessible as last screen in swipe order
 
 **Success Criteria:**
-- [ ] Create Plan Screen always exists and is always last in swipe order
-- [ ] After first plan created, user can swipe between Plan Screen and Create Plan Screen
-- [ ] Each plan occupies full screen with header showing plan name
-- [ ] Swipe left/right navigates between plans in app:plans order
-- [ ] New plans saved to AsyncStorage and synced to server
-- [ ] Each plan has unique planId, accessKey, and meUserId set correctly
+- [ ] New plan inserted into `app:plans` array
+- [ ] Plan accessible via swipe navigation (before Create Plan Screen)
+- [ ] AsyncStorage contains: `plan:{id}:accessKey`, `plan:{id}:meUserId` with correct values
+- [ ] Plan synced to server (POST /tasks), or queued if offline
+- [ ] Default user included in `plan.users` dictionary with key from getUniqueUserId()
+- [ ] `plan.authorId` matches meUserId (dictionary key for "me" user)
+- [ ] User sees new plan screen with chosen title with empty tasks list and "Add Task" option
 
 **Error Cases:**
-- **Server unavailable during creation:** Save plan locally, queue sync, show "Offline" indicator
-- **AsyncStorage full:** Show error "Storage full, cannot create plan"
-- **Empty plan name:** Use default "New Plan" or "Plan N" (N = count + 1)
+- **Empty title:** Show inline error "Plan title is required", prevent creation
+- **Duplicate title:** Show warning "Plan with this name exists. Continue?", allow creation with confirmation
+- **Server unavailable:** Save plan locally, queue sync, show "Offline" banner
+- **AsyncStorage full/error:** Show error "Cannot save plan, storage unavailable", do not create plan
 
 **Technical Notes:**
-- Storage: `app:plans` array updated, `plan:{id}:accessKey` and `plan:{id}:meUserId` created
-- API: POST /tasks with full plan object (Plan extends Task)
-- State: Current plan index tracked (for swipe navigation)
-- UI: Horizontal swipeable view (React Native FlatList/ScrollView with pagination)
+- **Storage:**
+  - `app:plans` array updated with new plan ID
+  - `plan:{id}:accessKey` stores string (UUID)
+  - `plan:{id}:meUserId` stores user ID key from Plan.users dictionary (e.g., "user-1")
+- **API:** POST /tasks with full Plan object (server treats as root task with `users` dictionary)
+- **User ID structure:**
+  - User object does NOT have `id` field - User ID is the dictionary key in Plan.users
+  - Plan.users is `Record<string, User>` (TypeScript) or `Dict[str, User]` (Python)
+  - User IDs are simple strings like "user-1", "user-2" (generated by getUniqueUserId())
+  - getUniqueUserId() finds max numeric suffix and returns "user-{max+1}"
+  - User ID is immutable once assigned - cannot be changed, only deleted
+  - Task.authorId and Task.assigneeId reference user IDs (dictionary keys)
+  - meUserId in AsyncStorage identifies which dictionary key represents "me" in this plan
+- **Helper methods:**
+  - `generateTaskId(): string` - generates UUID for new task/plan ID
+  - `generateAccessKey(): string` - generates UUID for plan sharing
+  - `getUniqueUserId(users: Record<string, User>): string` - returns next available user ID for plan
+  - `getTasksUsingUserId(task: Task, userId: string, allTasksMap: Map<string, Task>): Task[]` - recursively finds all tasks where userId is used as authorId or assigneeId
+- **State:** Current screen index updated to show new plan
+- **UI:** FlatList with horizontal pagination, new plan inserted before Create Plan Screen
 
 ---
 

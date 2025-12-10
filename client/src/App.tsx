@@ -11,10 +11,14 @@ import {
   Dimensions,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import EXAMPLE_PLANS from './data/examples';
 import * as api from './api';
 import type { Task, Plan } from './models';
+import { createNewPlan, getUniqueUserId } from './models/plan';
+import { getDefaultUser, generateAccessKey, addPlan } from './storage/app';
+import { CreatePlanDialog } from './components/CreatePlanDialog';
 
 type ExamplePlan = { plan: Plan; tasks: Task[] };
 
@@ -27,6 +31,7 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [showCreateDialog, setShowCreateDialog] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
   function handleOpen(p: ExamplePlan) {
@@ -36,6 +41,74 @@ export default function App() {
   function handleClose() {
     setSelected(null);
   }
+
+  const handleCreatePlan = async (title: string, description?: string) => {
+    try {
+      // Check for duplicate title
+      const existingTitles = plans.map(p => p.plan.title.toLowerCase());
+      if (existingTitles.includes(title.toLowerCase())) {
+        Alert.alert(
+          'Duplicate Title',
+          'Plan with this name exists. Continue?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Continue', 
+              onPress: () => performCreatePlan(title, description),
+            },
+          ]
+        );
+        return;
+      }
+
+      await performCreatePlan(title, description);
+    } catch (err: any) {
+      console.error('Failed to create plan', err);
+      Alert.alert('Error', 'Cannot save plan, storage unavailable');
+    }
+  };
+
+  const performCreatePlan = async (title: string, description?: string) => {
+    try {
+      // Get default user and generate IDs
+      const defaultUser = await getDefaultUser();
+      const accessKey = generateAccessKey();
+      const meUserId = getUniqueUserId({});
+
+      // Create new plan object
+      const newPlan = createNewPlan(title, description, accessKey, meUserId, defaultUser);
+
+      // Save to AsyncStorage
+      await addPlan(newPlan.id, accessKey, meUserId);
+
+      // Add to local state
+      const newExamplePlan: ExamplePlan = {
+        plan: newPlan,
+        tasks: [],
+      };
+      setPlans(prev => [...prev, newExamplePlan]);
+
+      // Close dialog
+      setShowCreateDialog(false);
+
+      // Navigate to new plan (last plan before Create Screen)
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: plans.length, // New plan will be at this index
+          animated: true,
+        });
+      }, 100);
+
+      // Sync to server in background
+      api.postTask(newPlan).catch(err => {
+        console.warn('Failed to sync plan to server', err);
+        setError('Offline - plan saved locally');
+      });
+    } catch (err: any) {
+      console.error('Failed to create plan', err);
+      throw err;
+    }
+  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -64,10 +137,13 @@ export default function App() {
       // Create Plan Screen
       return (
         <View style={[styles.screenContainer, { width: SCREEN_WIDTH }]}>
-          <View style={styles.createPlanScreen}>
+          <Pressable 
+            style={styles.createPlanScreen}
+            onPress={() => setShowCreateDialog(true)}
+          >
             <Text style={styles.createPlanIcon}>+</Text>
             <Text style={styles.createPlanText}>Create new Plan</Text>
-          </View>
+          </Pressable>
         </View>
       );
     }
@@ -186,6 +262,12 @@ export default function App() {
           </SafeAreaView>
         )}
       </Modal>
+
+      <CreatePlanDialog
+        visible={showCreateDialog}
+        onCancel={() => setShowCreateDialog(false)}
+        onCreate={handleCreatePlan}
+      />
     </View>
   );
 }
@@ -333,7 +415,7 @@ const styles = StyleSheet.create({
   planScreen: {
     flex: 1,
     width: '100%',
-    paddingTop: 106,
+    paddingTop: 156,
     padding: 16,
     backgroundColor: '#fff'
   },

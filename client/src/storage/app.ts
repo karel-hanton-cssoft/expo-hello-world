@@ -29,7 +29,6 @@ export async function getDefaultUser(): Promise<User> {
 
   // Create default user
   const defaultUser: User = {
-    id: 'defaultUser',
     displayName: 'Me',
   };
   await setDefaultUser(defaultUser);

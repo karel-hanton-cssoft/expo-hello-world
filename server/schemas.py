@@ -1,12 +1,14 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 # Simple alias for identifier strings
 ID = str
 
 class User(BaseModel):
-    """User represents a plan participant. No authentication - users are per-plan labels only."""
-    id: ID
+    """
+    User represents a plan participant. No authentication - users are per-plan labels only.
+    User ID is NOT part of this structure - it's the dictionary key in Plan.users (Task.users).
+    """
     displayName: str = Field(..., min_length=1, description="Display name shown in UI")
     firstName: Optional[str] = Field(None, description="Optional first name for full name display")
     lastName: Optional[str] = Field(None, description="Optional last name for full name display")
@@ -27,7 +29,7 @@ class TaskBase(BaseModel):
     updatedAt: Optional[str] = None
 
 class Task(TaskBase):
-    users: Optional[List[User]] = None
+    users: Optional[Dict[str, User]] = Field(None, description="Dictionary of users keyed by user ID (e.g., 'user-1', 'user-2')")
     accessKey: Optional[str] = None
 
 class TaskCreate(BaseModel):

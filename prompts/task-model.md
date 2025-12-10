@@ -22,18 +22,38 @@ Task (requirements)
     - automatic: presented state is based on subtasks (used for parent Tasks)
     - in_progress: assignee can set to inform about progress
     - done: assignee set when task is finished
-  - authorId: string - required; Plan user identification
-  - assigneeId: string - required; Plan user identification (same as authorId by default)
+  - authorId: string - required; User ID (key from Plan.users dictionary)
+  - assigneeId: string - optional; User ID (key from Plan.users dictionary); same as authorId by default
   - subtaskIds: string[] - required (may be empty); list of subtasks Ids
   - parentId: string - optional (None for Plan)
   - createdAt: string (ISO date-time) — required
+  - updatedAt: string (ISO date-time) - optional; last modification timestamp
+
+Task methods (instance methods on Task objects):
+- `getTasksUsingUserId(userId: string): Task[]`
+  - Returns array of all tasks (including this task) where userId is used as authorId or assigneeId
+  - Recursively searches through this task and all its subtasks
+  - Useful before deleting user from Plan.users to check if user is referenced
+  - Example: `plan.getTasksUsingUserId("user-1")` returns all tasks created by or assigned to user-1
+  - Note: Requires access to all tasks in the plan to resolve subtaskIds
   
 Plan (requirements)
-- Plan extends Task with following fileds:
-  - users: User[] - required (at least one user Plan author); users involved in this plan (`user-model.md`)
-    - User class contains id used for authorId ... 
+- Plan extends Task with following fields:
+  - users: Record<string, User> (TypeScript) or Dict[str, User] (Python) - required (at least one user - Plan author)
+    - Dictionary where key is user ID (e.g., "user-1", "user-2") and value is User object
+    - User IDs are immutable once assigned - cannot be changed, only deleted
+    - User object does NOT contain id field - ID is the dictionary key (see `user-model.md`)
   - accessKey: string - required (assigned by server e.g. UUID); enable access to Plan and all subTasks on API (how has key has access see `share-security.md`)
   - Note: there is NO `isPlan` boolean field. Plan is determined by root‑status (parentId missing/null).
+
+Plan methods (instance methods on Plan objects):
+- `getUniqueUserId(): string`
+  - Returns next available unique user ID for this plan
+  - Algorithm: finds all numeric suffixes in existing user IDs (e.g., "user-1" → 1, "user-42" → 42)
+  - Returns "user-{max+1}" where max is highest found number (or 0 if no users exist)
+  - Example: if Plan.users has keys ["user-1", "user-3"], returns "user-4"
+  - User IDs are immutable - once assigned, cannot be changed
+
 - Note: each Plan is represented by single UI screen (`client-ui.md`)
 
 Design rules & constraints
