@@ -29,7 +29,6 @@ export async function getDefaultUser(): Promise<User> {
 
   // Create default user
   const defaultUser: User = {
-    id: 'defaultUser',
     displayName: 'Me',
   };
   await setDefaultUser(defaultUser);
@@ -44,6 +43,37 @@ export async function setDefaultUser(user: User): Promise<void> {
     await AsyncStorage.setItem(KEYS.DEFAULT_USER, JSON.stringify(user));
   } catch (err) {
     console.error('Failed to save default user', err);
+    throw err;
+  }
+}
+
+/**
+ * Get app settings; creates empty object if not exists.
+ */
+export async function getAppSettings(): Promise<Record<string, any>> {
+  try {
+    const json = await AsyncStorage.getItem('app:settings');
+    if (json) {
+      return JSON.parse(json);
+    }
+  } catch (err) {
+    console.warn('Failed to read app settings, creating default', err);
+  }
+  
+  // Create default empty settings
+  const defaultSettings = {};
+  await setAppSettings(defaultSettings);
+  return defaultSettings;
+}
+
+/**
+ * Save app settings.
+ */
+export async function setAppSettings(settings: Record<string, any>): Promise<void> {
+  try {
+    await AsyncStorage.setItem('app:settings', JSON.stringify(settings));
+  } catch (err) {
+    console.error('Failed to save app settings', err);
     throw err;
   }
 }

@@ -4,20 +4,19 @@
       "title": "Supermarket trip",
       "description": "Buy groceries for the week",
       "status": "new",
-      "authorId": "user:alice",
+      "authorId": "user-1",
       "subtaskIds": ["task:milk", "task:bread", "task:vegetables"],
       "createdAt": "2025-01-01T09:00:00.000Z",
       "accessKey": "access:plan:shopping:2025-01",
-      "users": [
-        {
-          "id": "user:alice",
+      "users": {
+        "user-1": {
           "displayName": "Alice",
           "firstName": "Alice",
           "lastName": "Johnson",
           "email": "alice.johnson@example.com",
           "phoneNumber": "+420 777 123 456"
         }
-      ]
+      }
     },
     "tasks": [
       {
@@ -25,7 +24,7 @@
         "title": "Buy milk",
         "description": "Whole milk + long-life option",
         "status": "new",
-        "authorId": "user:alice",
+        "authorId": "user-1",
         "subtaskIds": ["task:milk:check-fat"],
         "parentId": "plan:shopping:2025-01",
         "createdAt": "2025-01-01T09:05:00.000Z"
@@ -35,7 +34,7 @@
         "title": "Check fat percentage",
         "description": "Choose between skimmed, semi-skimmed or whole",
         "status": "new",
-        "authorId": "user:alice",
+        "authorId": "user-1",
         "parentId": "task:milk",
         "subtaskIds": [],
         "createdAt": "2025-01-01T09:06:00.000Z"
@@ -45,7 +44,7 @@
         "title": "Buy bread",
         "description": "Sourdough or seeded loaf",
         "status": "new",
-        "authorId": "user:alice",
+        "authorId": "user-1",
         "subtaskIds": ["task:bread:choose-type"],
         "parentId": "plan:shopping:2025-01",
         "createdAt": "2025-01-01T09:10:00.000Z"
@@ -55,7 +54,7 @@
         "title": "Choose bread type",
         "description": "Decide seeded or plain",
         "status": "new",
-        "authorId": "user:alice",
+        "authorId": "user-1",
         "parentId": "task:bread",
         "subtaskIds": [],
         "createdAt": "2025-01-01T09:11:00.000Z"
@@ -65,7 +64,7 @@
         "title": "Buy vegetables",
         "description": "Tomatoes, carrots, salad leaves",
         "status": "new",
-        "authorId": "user:alice",
+        "authorId": "user-1",
         "subtaskIds": ["task:vegetables:wash-sample"],
         "parentId": "plan:shopping:2025-01",
         "createdAt": "2025-01-01T09:20:00.000Z"
@@ -75,7 +74,7 @@
         "title": "Wash sample vegetables",
         "description": "Quickly rinse a few vegetables to check freshness",
         "status": "new",
-        "authorId": "user:alice",
+        "authorId": "user-1",
         "parentId": "task:vegetables",
         "subtaskIds": [],
         "createdAt": "2025-01-01T09:21:00.000Z"

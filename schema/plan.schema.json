@@ -8,7 +8,11 @@
       "type": "object",
       "required": ["accessKey", "users"],
       "properties": {
-        "users": { "type": "array", "items": { "$ref": "./user.schema.json" } },
+        "users": {
+          "type": "object",
+          "description": "Dictionary of users keyed by user ID (e.g., 'user-1', 'user-2')",
+          "additionalProperties": { "$ref": "./user.schema.json" }
+        },
         "accessKey": { "type": "string" }
       },
       "additionalProperties": true

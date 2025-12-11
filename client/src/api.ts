@@ -35,4 +35,67 @@ export function groupIntoPlans(tasks: Task[]) {
   return roots.map((r) => ({ plan: r, tasks: [r, ...collectDescendants(r)] }));
 }
 
-export default { fetchAllTasks, groupIntoPlans };
+/**
+ * Post a new task/plan to the server.
+ * @param task - Task or Plan object to create on server
+ * @returns Created task from server
+ */
+export async function postTask(task: Task): Promise<Task> {
+  const url = `${SERVER}/tasks`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(task),
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error');
+    throw new Error(`POST task failed: ${res.status} - ${errorText}`);
+  }
+  
+  return await res.json() as Task;
+}
+
+/**
+ * Update a task/plan on the server (partial update).
+ * @param taskId - ID of task to update
+ * @param updates - Partial task object with fields to update
+ * @returns Updated task from server
+ */
+export async function patchTask(taskId: string, updates: Partial<Task>): Promise<Task> {
+  const url = `${SERVER}/tasks/${taskId}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(updates),
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error');
+    throw new Error(`PATCH task failed: ${res.status} - ${errorText}`);
+  }
+  
+  return await res.json() as Task;
+}
+
+/**
+ * Delete a task/plan from the server.
+ * @param taskId - ID of task to delete
+ */
+export async function deleteTask(taskId: string): Promise<void> {
+  const url = `${SERVER}/tasks/${taskId}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error');
+    throw new Error(`DELETE task failed: ${res.status} - ${errorText}`);
+  }
+}
+
+export default { fetchAllTasks, groupIntoPlans, postTask, patchTask, deleteTask };

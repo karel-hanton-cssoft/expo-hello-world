@@ -2,14 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/schemas/user.schema.json",
   "title": "User",
-  "description": "User represents a plan participant. No authentication or global identity - users are per-plan labels only.",
+  "description": "User represents a plan participant. No authentication or global identity - users are per-plan labels only. User ID is NOT part of this structure - it's the dictionary key in Plan.users.",
   "type": "object",
-  "required": ["id", "displayName"],
+  "required": ["displayName"],
   "properties": {
-    "id": {
-      "type": "string",
-      "description": "Unique identifier (e.g. UUID) - cross-system unique"
-    },
     "displayName": {
       "type": "string",
       "description": "Display name shown in UI",

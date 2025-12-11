@@ -4,31 +4,28 @@
     "title": "Family weekend trip",
     "description": "Planning tasks for a short family trip",
     "status": "in_progress",
-    "authorId": "user:alice",
+    "authorId": "user-1",
     "subtaskIds": ["task:book-train", "task:buy-tickets", "task:pack-bags"],
     "createdAt": "2025-05-01T09:00:00.000Z",
     "accessKey": "access:plan:family-trip-2025",
-    "users": [
-      {
-        "id": "user:alice",
+    "users": {
+      "user-1": {
         "displayName": "Alice",
         "firstName": "Alice",
         "lastName": "Johnson",
         "email": "alice.johnson@example.com",
         "phoneNumber": "+420 777 123 456"
       },
-      {
-        "id": "user:bob",
+      "user-2": {
         "displayName": "Bob",
         "email": "bob@example.com"
       },
-      {
-        "id": "user:charlie",
+      "user-3": {
         "displayName": "Charlie",
         "firstName": "Charlie",
         "lastName": "Smith"
       }
-    ]
+    }
   },
   "tasks": [
     {
@@ -36,7 +33,7 @@
       "title": "Book train tickets",
       "description": "Find suitable train connections and times",
       "status": "in_progress",
-      "authorId": "user:alice",
+      "authorId": "user-1",
       "subtaskIds": ["task:book-train:check-discounts"],
       "parentId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:05:00.000Z"
@@ -45,7 +42,7 @@
       "id": "task:book-train:check-discounts",
       "title": "Check discounts and promotions",
       "status": "new",
-      "authorId": "user:alice",
+      "authorId": "user-1",
       "parentId": "task:book-train",
       "subtaskIds": [],
       "createdAt": "2025-05-01T09:06:00.000Z"
@@ -55,7 +52,7 @@
       "title": "Purchase tickets",
       "description": "Buy event tickets for the trip",
       "status": "new",
-      "authorId": "user:bob",
+      "authorId": "user-2",
       "subtaskIds": ["task:buy-tickets:select-seats"],
       "parentId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:10:00.000Z"
@@ -64,7 +61,7 @@
       "id": "task:buy-tickets:select-seats",
       "title": "Select seats for tickets",
       "status": "new",
-      "authorId": "user:bob",
+      "authorId": "user-2",
       "parentId": "task:buy-tickets",
       "subtaskIds": [],
       "createdAt": "2025-05-01T09:11:00.000Z"
@@ -74,7 +71,7 @@
       "title": "Pack bags",
       "description": "Pack clothes and essentials",
       "status": "in_progress",
-      "authorId": "user:alice",
+      "authorId": "user-1",
       "subtaskIds": ["task:pack-bags:pack-clothes"],
       "parentId": "plan:family-trip-2025",
       "createdAt": "2025-05-01T09:20:00.000Z"
@@ -83,7 +80,7 @@
       "id": "task:pack-bags:pack-clothes",
       "title": "Pack clothes",
       "status": "in_progress",
-      "authorId": "user:alice",
+      "authorId": "user-1",
       "subtaskIds": ["task:pack-bags:pack-clothes:pack-socks"],
       "parentId": "task:pack-bags",
       "createdAt": "2025-05-01T09:21:00.000Z"
@@ -92,7 +89,7 @@
       "id": "task:pack-bags:pack-clothes:pack-socks",
       "title": "Pack socks",
       "status": "new",
-      "authorId": "user:charlie",
+      "authorId": "user-3",
       "parentId": "task:pack-bags:pack-clothes",
       "subtaskIds": [],
       "createdAt": "2025-05-01T09:22:00.000Z"

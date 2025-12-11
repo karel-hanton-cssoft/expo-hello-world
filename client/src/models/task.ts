@@ -28,4 +28,70 @@ export interface Task {
   updatedAt?: string; // ISO date-time
 }
 
+/**
+ * Get all tasks that reference a specific user ID.
+ * Recursively searches through this task and all its subtasks.
+ * @param task - The task to start from (typically the plan itself)
+ * @param userId - User ID to search for (key from Plan.users dictionary)
+ * @param allTasksMap - Map of all tasks by ID (for resolving subtaskIds)
+ * @returns Array of tasks where userId is used as authorId or assigneeId
+ */
+export function getTasksUsingUserId(task: Task, userId: ID, allTasksMap: Map<ID, Task>): Task[] {
+  const result: Task[] = [];
+  
+  // Check this task
+  if (task.authorId === userId || task.assigneeId === userId) {
+    result.push(task);
+  }
+  
+  // Recursively check all subtasks
+  for (const subtaskId of task.subtaskIds) {
+    const subtask = allTasksMap.get(subtaskId);
+    if (subtask) {
+      result.push(...getTasksUsingUserId(subtask, userId, allTasksMap));
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Generate Task/Plan ID using UUID v4 pattern.
+ * This is the SINGLE SOURCE OF TRUTH for Task/Plan identification.
+ * Returns pure UUID string like "550e8400-e29b-41d4-a716-446655440000".
+ * NO prefixes like "task:" or "plan:" - just the UUID.
+ * 
+ * Usage:
+ * - Client generates ID once when creating Task/Plan
+ * - Server stores this exact ID unchanged
+ * - All references (parentId, subtaskIds, plan keys) use this exact ID
+ */
+export function generateTaskId(): string {
+  // React Native doesn't have crypto.randomUUID(), use fallback
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * Create new Task object with default values.
+ * @param parentId - ID of parent Task (can be Plan ID or Task ID)
+ * @param authorId - User ID of task creator (from plan.users dictionary key)
+ * @returns New Task object ready for editing
+ */
+export function createNewTask(parentId: ID, authorId: ID): Task {
+  return {
+    id: generateTaskId(),
+    title: 'New Task',
+    status: TaskStatus.NEW,
+    authorId,
+    assigneeId: undefined,
+    subtaskIds: [],
+    parentId,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export default Task;
