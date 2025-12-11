@@ -47,6 +47,7 @@ export default function App() {
   const [showUserDialog, setShowUserDialog] = useState<boolean>(false);
   const [userDialogMode, setUserDialogMode] = useState<'editDefault' | 'createPlanUser' | 'editPlanUser'>('editDefault');
   const [userDialogInitialValues, setUserDialogInitialValues] = useState<Partial<User> | undefined>(undefined);
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
   function handleOpen(p: ExamplePlan) {
@@ -96,10 +97,44 @@ export default function App() {
     try {
       await saveDefaultUser(user as User);
       setShowUserDialog(false);
+      setIsFirstLaunch(false);
+      
+      // Initialize app settings if first launch
+      if (isFirstLaunch) {
+        const { setAppSettings } = await import('./storage/app');
+        await setAppSettings({});
+      }
+      
       Alert.alert('Success', 'Default user updated successfully');
     } catch (err) {
       console.error('Failed to save default user', err);
       Alert.alert('Error', 'Failed to save user data');
+    }
+  };
+
+  const checkFirstLaunch = async () => {
+    try {
+      const { getDefaultUser } = await import('./storage/app');
+      const user = await getDefaultUser();
+      
+      // Check if this is truly first launch (default user is just "Me")
+      const isDefaultProfile = user.displayName === 'Me' && 
+                               !user.firstName && 
+                               !user.lastName && 
+                               !user.email && 
+                               !user.phoneNumber;
+      
+      if (isDefaultProfile) {
+        // First launch - show setup dialog
+        setIsFirstLaunch(true);
+        setUserDialogMode('editDefault');
+        setUserDialogInitialValues({
+          displayName: 'Me',
+        });
+        setShowUserDialog(true);
+      }
+    } catch (err) {
+      console.error('Failed to check first launch', err);
     }
   };
 
@@ -457,6 +492,9 @@ export default function App() {
   React.useEffect(() => {
     let mounted = true;
     (async () => {
+      // Check for first launch before loading data
+      await checkFirstLaunch();
+      
       try {
         const tasks = await api.fetchAllTasks(1000);
         const grouped = api.groupIntoPlans(tasks);
@@ -768,6 +806,7 @@ export default function App() {
         visible={showUserDialog}
         mode={userDialogMode}
         initialValues={userDialogInitialValues}
+        isFirstLaunch={isFirstLaunch}
         onCancel={() => setShowUserDialog(false)}
         onSave={handleSaveDefaultUser}
       />

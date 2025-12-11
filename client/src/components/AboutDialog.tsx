@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { clearAllAppData } from '../storage/app';
 
 export interface AboutDialogProps {
   visible: boolean;
@@ -7,6 +8,34 @@ export interface AboutDialogProps {
 }
 
 export default function AboutDialog({ visible, onClose }: AboutDialogProps) {
+  const handleClearData = () => {
+    Alert.alert(
+      'Clear All App Data?',
+      'This will delete all local data including user profile and plans. The app will restart. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Data',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await clearAllAppData();
+              Alert.alert('Success', 'App data cleared. Please restart the app.', [
+                {
+                  text: 'OK',
+                  onPress: onClose,
+                },
+              ]);
+            } catch (err) {
+              console.error('Failed to clear app data', err);
+              Alert.alert('Error', 'Failed to clear app data');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -60,6 +89,20 @@ export default function AboutDialog({ visible, onClose }: AboutDialogProps) {
             <Text style={styles.sectionTitle}>License</Text>
             <Text style={styles.sectionText}>
               © 2025 Task Planner. All rights reserved.
+            </Text>
+          </View>
+
+          {/* Development Tools */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Development Tools</Text>
+            <TouchableOpacity
+              style={styles.dangerButton}
+              onPress={handleClearData}
+            >
+              <Text style={styles.dangerButtonText}>🗑️ Clear All App Data</Text>
+            </TouchableOpacity>
+            <Text style={styles.dangerNote}>
+              Use this to test first launch flow. This will delete all local data.
             </Text>
           </View>
         </ScrollView>
@@ -127,5 +170,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#555',
     lineHeight: 24,
+  },
+  dangerButton: {
+    backgroundColor: '#ff3b30',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dangerButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dangerNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });

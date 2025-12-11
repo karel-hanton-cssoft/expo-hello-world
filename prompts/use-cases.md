@@ -50,44 +50,64 @@ This document defines high-level user workflows for the Just Plan It application
 
 ## Example Use Case
 
-## UC-01: First App Launch & Setup
+## UC-01: First App Launch & Setup ✅
+
+**Status:** IMPLEMENTED
 
 **Actor:** New User
 
 **Precondition:** 
 - App freshly installed
-- No previous data in AsyncStorage
+- No previous data in AsyncStorage, OR
+- Default user is still default profile (displayName="Me" with no other fields)
 
 **Main Flow:**
 1. User opens app for the first time
-2. App detects First Start (no default user exists, no other app data are stored)
-3. App shows welcome screen with default profile (id="defaultUser", displayName="Me")
-4. App prompts user: "Let's set up your profile"
-5. User edits displayName to "John", optionally adds email or phone number 
-   - None is required ("Me" is used in such case)
+2. App calls `getDefaultUser()` which creates default user if none exists (displayName="Me")
+3. App checks if user profile is still default (only displayName="Me", no other fields)
+4. If default profile detected → App shows UserDialog in "first launch" mode:
+   - Welcome message: "👋 Welcome to Task Planner! Let's set up your profile"
+   - Explanation: "You can use the default 'Me' or customize it with your details"
+   - Form pre-filled with displayName="Me"
+   - **NO Back/Cancel button** (user must continue)
+   - Button text: "Continue" (instead of "Save")
+5. User can:
+   - Keep default "Me" and tap Continue, OR
+   - Edit displayName to "John" and optionally add firstName, lastName, email, phoneNumber, OR
+   - Tap "Import from Contacts" to auto-fill from phone contacts
 6. User taps "Continue"
-7. App saves updated profile via setDefaultUser()
-8. App saves default App Settings
-   - saves empty App-settings object "{}" - reserved for future to add items
-9. App get to main operational state Plans Display
-    - for first time shows empty plans list with function "Create Plan" function.
+7. App validates (displayName is required)
+8. App saves updated profile via `saveDefaultUser()`
+9. App initializes empty app settings: `setAppSettings({})`
+10. Dialog closes, app shows main operational state (Plans Display)
+    - First time shows empty plans list with "Create Plan" button
 
 **Success Criteria:**
-- [ ] Default user created automatically on first launch
-- [ ] User can edit profile before continuing
-- [ ] Profile persists in AsyncStorage (app:defaultUser)
-- [ ] App settings persists in AsyncStorage (app:settings) (as empty object)
-- [ ] Empty plans list displayed
-- [ ] User can proceed to create first plan
+- [x] Default user created automatically on first app start
+- [x] UserDialog shown in onboarding mode when default profile detected
+- [x] User cannot cancel/skip during first launch (no Back button)
+- [x] User can edit profile fields or import from contacts
+- [x] Profile persists in AsyncStorage (app:defaultUser)
+- [x] App settings initialized in AsyncStorage (app:settings) as empty object
+- [x] Empty plans list displayed after setup
+- [x] User can proceed to create first plan
 
 **Error Cases:**
 - **AsyncStorage unavailable:** Show error "Storage not available, app cannot function"
-- **User skips profile setup:** Allow continuation with warning; user can update profile later in settings
+- **Contact import fails:** Show error, allow manual entry
+- **Validation fails (empty displayName):** Show inline error, prevent Continue until fixed
 
 **Technical Notes:**
-- Storage: `app:defaultUser` and `app:settings` are always created (at least with default values)
+- Storage: `app:defaultUser` and `app:settings` are always created
+- Detection: Checks if displayName="Me" AND all other User fields are empty/undefined
+- Dialog: UserDialog with `isFirstLaunch={true}` prop
+  - Hides Back button
+  - Shows welcome section
+  - Changes button text to "Continue"
+  - Blocks `onRequestClose` (no back gesture)
 - API: None (purely local)
-- State: App ready for plan creation
+- State: `isFirstLaunch` state in App.tsx
+- Implementation: `checkFirstLaunch()` called in initial `useEffect`
 
 ---
 

@@ -18,6 +18,7 @@ export interface UserDialogProps {
   visible: boolean;
   mode: 'editDefault' | 'createPlanUser' | 'editPlanUser';
   initialValues?: Partial<User>;
+  isFirstLaunch?: boolean;
   onCancel: () => void;
   onSave: (user: Partial<User>) => void;
 }
@@ -26,6 +27,7 @@ export default function UserDialog({
   visible,
   mode,
   initialValues,
+  isFirstLaunch = false,
   onCancel,
   onSave,
 }: UserDialogProps) {
@@ -60,6 +62,9 @@ export default function UserDialog({
   }, [visible]);
 
   const getTitle = () => {
+    if (isFirstLaunch) {
+      return "Let's Set Up Your Profile";
+    }
     switch (mode) {
       case 'editDefault':
         return 'Edit Default User';
@@ -118,50 +123,36 @@ export default function UserDialog({
         return;
       }
 
-      // Note: expo-contacts doesn't have presentContactPickerAsync in all versions
-      // We'll get all contacts and let user pick (simplified approach)
-      const { data } = await Contacts.getContactsAsync({
-        fields: [
-          Contacts.Fields.Name,
-          Contacts.Fields.FirstName,
-          Contacts.Fields.LastName,
-          Contacts.Fields.Emails,
-          Contacts.Fields.PhoneNumbers,
-        ],
-      });
-
-      if (data.length === 0) {
-        Alert.alert('No Contacts', 'No contacts found in your phone.');
+      // Use the native contact picker
+      const contact = await Contacts.presentContactPickerAsync();
+      
+      // If no contact was selected (null or undefined), return
+      if (!contact) {
         return;
       }
 
-      // For now, show alert with instructions
-      // In full implementation, would show a picker
-      Alert.alert(
-        'Import Contact',
-        'Contact import functionality will open a contact picker. For this demo, using first contact if available.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Use First Contact',
-            onPress: () => {
-              const contact = data[0];
-              if (contact.name) setDisplayName(contact.name);
-              if (contact.firstName) setFirstName(contact.firstName);
-              if (contact.lastName) setLastName(contact.lastName);
-              if (contact.emails && contact.emails.length > 0) {
-                setEmail(contact.emails[0].email || '');
-              }
-              if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-                setPhoneNumber(contact.phoneNumbers[0].number || '');
-              }
-            },
-          },
-        ]
-      );
+      // Fill in the form fields from selected contact
+      if (contact.name) {
+        setDisplayName(contact.name);
+      } else if (contact.firstName && contact.lastName) {
+        setDisplayName(`${contact.firstName} ${contact.lastName}`);
+      } else if (contact.firstName) {
+        setDisplayName(contact.firstName);
+      }
+      
+      if (contact.firstName) setFirstName(contact.firstName);
+      if (contact.lastName) setLastName(contact.lastName);
+      
+      if (contact.emails && contact.emails.length > 0) {
+        setEmail(contact.emails[0].email || '');
+      }
+      
+      if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+        setPhoneNumber(contact.phoneNumbers[0].number || '');
+      }
     } catch (error) {
       console.error('Error importing contact:', error);
-      Alert.alert('Error', 'Failed to import contact');
+      Alert.alert('Error', 'Failed to import contact. Please try again.');
     }
   };
 
@@ -169,7 +160,7 @@ export default function UserDialog({
     <Modal
       visible={visible}
       animationType="slide"
-      onRequestClose={onCancel}
+      onRequestClose={isFirstLaunch ? undefined : onCancel}
     >
       <KeyboardAvoidingView
         style={styles.container}
@@ -177,17 +168,35 @@ export default function UserDialog({
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onCancel} style={styles.headerButton}>
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
+          {!isFirstLaunch && (
+            <TouchableOpacity onPress={onCancel} style={styles.headerButton}>
+              <Text style={styles.backText}>← Back</Text>
+            </TouchableOpacity>
+          )}
+          {isFirstLaunch && <View style={styles.headerButton} />}
+          
           <Text style={styles.headerTitle}>{getTitle()}</Text>
+          
           <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
-            <Text style={styles.saveText}>Save</Text>
+            <Text style={styles.saveText}>{isFirstLaunch ? 'Continue' : 'Save'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Form */}
         <ScrollView style={styles.formContainer}>
+          {/* Welcome Message for First Launch */}
+          {isFirstLaunch && (
+            <View style={styles.welcomeSection}>
+              <Text style={styles.welcomeTitle}>👋 Welcome to Task Planner!</Text>
+              <Text style={styles.welcomeText}>
+                Let's set up your profile. You can use the default "Me" or customize it with your details.
+              </Text>
+              <Text style={styles.welcomeNote}>
+                Note: You can import your information from contacts or fill it manually.
+              </Text>
+            </View>
+          )}
+
           {/* Display Name - Required */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
@@ -311,6 +320,32 @@ const styles = StyleSheet.create({
   formContainer: {
     flex: 1,
     padding: 16,
+  },
+  welcomeSection: {
+    backgroundColor: '#f0f8ff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  welcomeTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: '#555',
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  welcomeNote: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    lineHeight: 20,
   },
   inputGroup: {
     marginBottom: 20,
