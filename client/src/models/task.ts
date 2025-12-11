@@ -57,7 +57,14 @@ export function getTasksUsingUserId(task: Task, userId: ID, allTasksMap: Map<ID,
 
 /**
  * Generate Task/Plan ID using UUID v4 pattern.
- * Returns string like "550e8400-e29b-41d4-a716-446655440000".
+ * This is the SINGLE SOURCE OF TRUTH for Task/Plan identification.
+ * Returns pure UUID string like "550e8400-e29b-41d4-a716-446655440000".
+ * NO prefixes like "task:" or "plan:" - just the UUID.
+ * 
+ * Usage:
+ * - Client generates ID once when creating Task/Plan
+ * - Server stores this exact ID unchanged
+ * - All references (parentId, subtaskIds, plan keys) use this exact ID
  */
 export function generateTaskId(): string {
   // React Native doesn't have crypto.randomUUID(), use fallback
@@ -66,6 +73,25 @@ export function generateTaskId(): string {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+/**
+ * Create new Task object with default values.
+ * @param parentId - ID of parent Task (can be Plan ID or Task ID)
+ * @param authorId - User ID of task creator (from plan.users dictionary key)
+ * @returns New Task object ready for editing
+ */
+export function createNewTask(parentId: ID, authorId: ID): Task {
+  return {
+    id: generateTaskId(),
+    title: 'New Task',
+    status: TaskStatus.NEW,
+    authorId,
+    assigneeId: undefined,
+    subtaskIds: [],
+    parentId,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export default Task;

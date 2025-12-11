@@ -20,11 +20,10 @@ def list_tasks(parentId: Optional[str] = Query(None), limit: int = Query(100), o
 @app.post('/tasks', status_code=201)
 def create_task(payload: schemas.TaskCreate):
     now = datetime.utcnow().isoformat() + 'Z'
-    # build minimal Task object (id must be provided by client or generated)
+    # build minimal Task object (id MUST be provided by client)
     task = payload.model_dump()
-    # if no id provided, generate one (not in prompt, but helpful)
-    if 'id' not in task or not task.get('id'):
-        task['id'] = f"task:{int(datetime.utcnow().timestamp())}"
+    # Client generates task.id (UUID v4) - single source of truth
+    # Server stores it unchanged - NO server-side ID generation
     task.setdefault('subtaskIds', [])
     task['createdAt'] = now
     task['updatedAt'] = None
@@ -42,6 +41,20 @@ def get_task(id: str = Path(...)):
 
 @app.put('/tasks/{id}')
 def update_task(id: str, payload: schemas.TaskUpdate):
+    existing = db.get_task(id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail='Not found')
+    data = existing
+    update = payload.model_dump(exclude_unset=True)
+    data.update(update)
+    data['updatedAt'] = datetime.utcnow().isoformat() + 'Z'
+    db.upsert_task(data)
+    return data
+
+
+@app.patch('/tasks/{id}')
+def patch_task(id: str, payload: schemas.TaskUpdate):
+    """Partial update of task (e.g., updating subtaskIds array)"""
     existing = db.get_task(id)
     if existing is None:
         raise HTTPException(status_code=404, detail='Not found')
