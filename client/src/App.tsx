@@ -23,6 +23,7 @@ import { TaskDialog } from './components/TaskDialog';
 import TaskItem from './components/TaskItem';
 import AboutDialog from './components/AboutDialog';
 import UserDialog from './components/UserDialog';
+import PlanUsersDialog from './components/PlanUsersDialog';
 
 type ExamplePlan = { plan: Plan; tasks: Task[] };
 
@@ -48,6 +49,8 @@ export default function App() {
   const [userDialogMode, setUserDialogMode] = useState<'editDefault' | 'createPlanUser' | 'editPlanUser'>('editDefault');
   const [userDialogInitialValues, setUserDialogInitialValues] = useState<Partial<User> | undefined>(undefined);
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean>(false);
+  const [planMenuVisible, setPlanMenuVisible] = useState<boolean>(false);
+  const [showPlanUsersDialog, setShowPlanUsersDialog] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
 
   function handleOpen(p: ExamplePlan) {
@@ -136,6 +139,32 @@ export default function App() {
     } catch (err) {
       console.error('Failed to check first launch', err);
     }
+  };
+
+  const togglePlanMenu = () => {
+    setPlanMenuVisible(!planMenuVisible);
+  };
+
+  const closePlanMenu = () => {
+    setPlanMenuVisible(false);
+  };
+
+  const handlePlanMenuItemPress = (action: () => void) => {
+    action();
+    closePlanMenu();
+  };
+
+  const openPlanUsersDialog = () => {
+    setShowPlanUsersDialog(true);
+  };
+
+  const handlePlanUpdate = (updatedPlan: Plan) => {
+    // Update plan in plans array
+    setPlans(prevPlans => 
+      prevPlans.map(p => 
+        p.plan.id === updatedPlan.id ? { ...p, plan: updatedPlan } : p
+      )
+    );
   };
 
   const openCreatePlanDialog = async () => {
@@ -511,6 +540,13 @@ export default function App() {
     };
   }, []);
 
+  // Auto-close Plan Context Menu when plan changes
+  React.useEffect(() => {
+    if (planMenuVisible) {
+      closePlanMenu();
+    }
+  }, [currentIndex]);
+
   // Create screens array: plans + Create Plan Screen
   const screens = [...plans, { isCreateScreen: true }];
 
@@ -697,6 +733,13 @@ export default function App() {
           >
             <Text style={styles.refreshText}>Refresh</Text>
           </Pressable>
+          
+          {/* Plan Context Menu - pouze pokud je zobrazený validní plán */}
+          {currentIndex < plans.length && !(screens[currentIndex] as any).isCreateScreen && (
+            <Pressable onPress={togglePlanMenu} style={styles.contextMenuButton}>
+              <Text style={styles.contextMenuIcon}>⋮</Text>
+            </Pressable>
+          )}
         </View>
 
         {error && (
@@ -810,6 +853,36 @@ export default function App() {
         onCancel={() => setShowUserDialog(false)}
         onSave={handleSaveDefaultUser}
       />
+
+      {/* Plan Context Menu */}
+      {planMenuVisible && (
+        <>
+          <Pressable 
+            style={styles.menuBackdrop} 
+            onPress={closePlanMenu}
+          />
+          <View style={styles.planMenuContainer}>
+            <Pressable 
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => handlePlanMenuItemPress(openPlanUsersDialog)}
+            >
+              <Text style={styles.menuIcon}>👥</Text>
+              <Text style={styles.menuLabel}>Users</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
+
+      {/* Plan Users Dialog */}
+      {currentIndex < plans.length && !(screens[currentIndex] as any).isCreateScreen && (
+        <PlanUsersDialog
+          visible={showPlanUsersDialog}
+          plan={plans[currentIndex].plan}
+          tasks={plans[currentIndex].tasks}
+          onClose={() => setShowPlanUsersDialog(false)}
+          onUpdate={handlePlanUpdate}
+        />
+      )}
     </View>
   );
 }
@@ -965,6 +1038,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+  },
+
+  // Plan Context Menu styles
+  contextMenuButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 6,
+  },
+  contextMenuIcon: {
+    fontSize: 24,
+    color: '#333',
+    fontWeight: '700',
+    lineHeight: 24,
+  },
+  planMenuContainer: {
+    position: 'absolute',
+    top: STATUS_BAR_HEIGHT + 60,
+    right: 0,
+    width: 280,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 1000,
+    marginRight: 8,
   },
 
   errorBanner: {
