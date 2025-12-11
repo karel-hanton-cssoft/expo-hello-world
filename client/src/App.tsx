@@ -18,9 +18,11 @@ import * as api from './api';
 import type { Task, Plan, User } from './models';
 import { createNewPlan, getUniqueUserId } from './models/plan';
 import { createNewTask } from './models/task';
-import { getDefaultUser, generateAccessKey, addPlan, getMeUserId, removePlan } from './storage/app';
+import { getDefaultUser, generateAccessKey, addPlan, getMeUserId, removePlan, saveDefaultUser } from './storage/app';
 import { TaskDialog } from './components/TaskDialog';
 import TaskItem from './components/TaskItem';
+import AboutDialog from './components/AboutDialog';
+import UserDialog from './components/UserDialog';
 
 type ExamplePlan = { plan: Plan; tasks: Task[] };
 
@@ -40,6 +42,11 @@ export default function App() {
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [dialogInitialValues, setDialogInitialValues] = useState<{title?: string; description?: string; assigneeId?: string} | undefined>(undefined);
   const [defaultUserForDialog, setDefaultUserForDialog] = useState<Record<string, User>>({});
+  const [menuVisible, setMenuVisible] = useState<boolean>(false);
+  const [showAboutDialog, setShowAboutDialog] = useState<boolean>(false);
+  const [showUserDialog, setShowUserDialog] = useState<boolean>(false);
+  const [userDialogMode, setUserDialogMode] = useState<'editDefault' | 'createPlanUser' | 'editPlanUser'>('editDefault');
+  const [userDialogInitialValues, setUserDialogInitialValues] = useState<Partial<User> | undefined>(undefined);
   const flatListRef = useRef<FlatList>(null);
 
   function handleOpen(p: ExamplePlan) {
@@ -49,6 +56,52 @@ export default function App() {
   function handleClose() {
     setSelected(null);
   }
+
+  const toggleMenu = () => {
+    setMenuVisible(!menuVisible);
+  };
+
+  const closeMenu = () => {
+    setMenuVisible(false);
+  };
+
+  const handleMenuItemPress = (action: () => void) => {
+    action();
+    closeMenu();
+  };
+
+  const openAboutDialog = () => {
+    setShowAboutDialog(true);
+  };
+
+  const openDefaultUserDialog = async () => {
+    try {
+      const defaultUser = await getDefaultUser();
+      setUserDialogMode('editDefault');
+      setUserDialogInitialValues({
+        displayName: defaultUser.displayName,
+        firstName: defaultUser.firstName,
+        lastName: defaultUser.lastName,
+        email: defaultUser.email,
+        phoneNumber: defaultUser.phoneNumber,
+      });
+      setShowUserDialog(true);
+    } catch (err) {
+      console.error('Failed to load default user', err);
+      Alert.alert('Error', 'Failed to load user data');
+    }
+  };
+
+  const handleSaveDefaultUser = async (user: Partial<User>) => {
+    try {
+      await saveDefaultUser(user as User);
+      setShowUserDialog(false);
+      Alert.alert('Success', 'Default user updated successfully');
+    } catch (err) {
+      console.error('Failed to save default user', err);
+      Alert.alert('Error', 'Failed to save user data');
+    }
+  };
 
   const openCreatePlanDialog = async () => {
     setDialogMode('create');
@@ -563,6 +616,11 @@ export default function App() {
       {/* Floating header - positioned below status bar */}
       <View style={[styles.floatingHeader, { top: STATUS_BAR_HEIGHT }]}>
         <View style={styles.headerRow}>
+          {/* Hamburger Menu Icon */}
+          <Pressable onPress={toggleMenu} style={styles.hamburgerButton}>
+            <Text style={styles.hamburgerIcon}>☰</Text>
+          </Pressable>
+          
           <Text style={styles.title}>Plans ({currentIndex + 1}/{screens.length})</Text>
           <Pressable
             onPress={async () => {
@@ -671,6 +729,48 @@ export default function App() {
         onCancel={closeDialog}
         onSave={handleSaveTask}
       />
+
+      {/* Global Menu */}
+      {menuVisible && (
+        <>
+          <Pressable 
+            style={styles.menuBackdrop} 
+            onPress={closeMenu}
+          />
+          <View style={styles.menuContainer}>
+            <Pressable 
+              style={styles.menuItem}
+              onPress={() => handleMenuItemPress(openDefaultUserDialog)}
+            >
+              <Text style={styles.menuIcon}>👤</Text>
+              <Text style={styles.menuLabel}>Default User</Text>
+            </Pressable>
+            
+            <Pressable 
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => handleMenuItemPress(openAboutDialog)}
+            >
+              <Text style={styles.menuIcon}>ℹ️</Text>
+              <Text style={styles.menuLabel}>About</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
+
+      {/* About Dialog */}
+      <AboutDialog
+        visible={showAboutDialog}
+        onClose={() => setShowAboutDialog(false)}
+      />
+
+      {/* User Dialog */}
+      <UserDialog
+        visible={showUserDialog}
+        mode={userDialogMode}
+        initialValues={userDialogInitialValues}
+        onCancel={() => setShowUserDialog(false)}
+        onSave={handleSaveDefaultUser}
+      />
     </View>
   );
 }
@@ -770,6 +870,63 @@ const styles = StyleSheet.create({
     borderRadius: 6 
   },
   refreshText: { color: 'white', fontWeight: '700', fontSize: 14 },
+
+  // Hamburger Menu styles
+  hamburgerButton: {
+    padding: 8,
+    marginRight: 12,
+    borderRadius: 6,
+  },
+  hamburgerIcon: {
+    fontSize: 24,
+    color: '#333',
+    fontWeight: '600',
+  },
+  menuBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  menuContainer: {
+    position: 'absolute',
+    top: STATUS_BAR_HEIGHT + 60,
+    left: 0,
+    width: 280,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 1000,
+    marginLeft: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
+  },
+  menuIcon: {
+    fontSize: 20,
+    marginRight: 12,
+    width: 24,
+    textAlign: 'center',
+  },
+  menuLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
 
   errorBanner: {
     backgroundColor: '#fff3cd',
