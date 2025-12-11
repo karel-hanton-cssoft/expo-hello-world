@@ -37,6 +37,13 @@ cd /path/to/expo-hello-world
 .venv/bin/python -m server.import_examples --delete-all-before
 ```
 
+Development tools
+
+```bash
+# Dump all tasks from database (JSON format)
+.venv/bin/python -m server.dump_tasks
+```
+
 Deploy to remote server
 
 ```bash
