@@ -48,6 +48,11 @@ export async function setDefaultUser(user: User): Promise<void> {
 }
 
 /**
+ * Alias for setDefaultUser - saves default user profile.
+ */
+export const saveDefaultUser = setDefaultUser;
+
+/**
  * Get app settings; creates empty object if not exists.
  */
 export async function getAppSettings(): Promise<Record<string, any>> {
