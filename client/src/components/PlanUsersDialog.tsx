@@ -274,9 +274,15 @@ export default function PlanUsersDialog({
                       </Pressable>
 
                       <Pressable
-                        onPress={() => handleDeleteUser(user.id)}
+                        onPress={() => {
+                          if (canDelete) {
+                            handleDeleteUser(user.id);
+                          } else {
+                            const reason = getDeleteDisabledReason(user.id);
+                            Alert.alert('Cannot Delete User', reason || 'This user cannot be deleted.');
+                          }
+                        }}
                         style={[styles.actionButton, styles.deleteButton]}
-                        disabled={!canDelete}
                       >
                         <Text
                           style={[

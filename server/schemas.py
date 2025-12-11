@@ -48,3 +48,5 @@ class TaskUpdate(BaseModel):
     status: Optional[str] = None
     assigneeId: Optional[ID] = None
     subtaskIds: Optional[List[ID]] = None
+    users: Optional[Dict[str, User]] = None
+    accessKey: Optional[str] = None

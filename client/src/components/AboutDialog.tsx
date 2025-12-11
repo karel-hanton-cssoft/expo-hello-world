@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearAllAppData } from '../storage/app';
 
 export interface AboutDialogProps {
@@ -34,6 +35,46 @@ export default function AboutDialog({ visible, onClose }: AboutDialogProps) {
         },
       ]
     );
+  };
+
+  const handleShowAsyncStorage = async () => {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      if (keys.length === 0) {
+        Alert.alert('AsyncStorage', 'AsyncStorage is empty');
+        return;
+      }
+
+      const items = await AsyncStorage.multiGet(keys);
+      const storageData: Record<string, any> = {};
+
+      items.forEach(([key, value]) => {
+        try {
+          // Try to parse as JSON
+          storageData[key] = value ? JSON.parse(value) : null;
+        } catch {
+          // If not JSON, store as string
+          storageData[key] = value;
+        }
+      });
+
+      const jsonString = JSON.stringify(storageData, null, 2);
+      
+      // Show in alert with scrollable view
+      Alert.alert(
+        'AsyncStorage Content',
+        `Found ${keys.length} keys:\n\n${keys.join('\n')}\n\nCopy console for full JSON data`,
+        [{ text: 'OK' }]
+      );
+
+      // Log full data to console for easy copy
+      console.log('=== AsyncStorage Content ===');
+      console.log(jsonString);
+      console.log('=== End AsyncStorage ===');
+    } catch (err) {
+      console.error('Failed to read AsyncStorage', err);
+      Alert.alert('Error', 'Failed to read AsyncStorage data');
+    }
   };
 
   return (
@@ -95,6 +136,17 @@ export default function AboutDialog({ visible, onClose }: AboutDialogProps) {
           {/* Development Tools */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Development Tools</Text>
+            
+            <TouchableOpacity
+              style={styles.devButton}
+              onPress={handleShowAsyncStorage}
+            >
+              <Text style={styles.devButtonText}>📋 Show AsyncStorage Data</Text>
+            </TouchableOpacity>
+            <Text style={styles.devNote}>
+              Displays all AsyncStorage keys. Full JSON data is logged to console.
+            </Text>
+
             <TouchableOpacity
               style={styles.dangerButton}
               onPress={handleClearData}
@@ -188,5 +240,24 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  devButton: {
+    backgroundColor: '#007aff',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  devButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  devNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 16,
   },
 });
