@@ -10,7 +10,7 @@ export interface TaskItemProps {
   planUsers: Record<string, User>;
   onAddSubtask: (parentTaskId: string) => void;
   onViewDetails: (taskId: string) => void;
-  onDelete: (taskId: string) => void;
+  onDelete: (taskId: string) => void | Promise<void>;
   level?: number;
 }
 

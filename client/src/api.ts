@@ -98,4 +98,23 @@ export async function deleteTask(taskId: string): Promise<void> {
   }
 }
 
+/**
+ * Fetch a plan and all its descendants (subtree) from the server.
+ * Uses GET /tasks?planId={planId}&recursive=true endpoint.
+ * @param planId - ID of the plan (root task) to fetch
+ * @returns Object with items array and total count
+ */
+export async function fetchPlanSubtree(planId: string): Promise<{ items: Task[]; total: number }> {
+  const url = `${SERVER}/tasks?planId=${planId}&recursive=true`;
+  const res = await fetch(url);
+  
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error');
+    throw new Error(`Fetch plan subtree failed: ${res.status} - ${errorText}`);
+  }
+  
+  const json = await res.json();
+  return { items: json.items as Task[], total: json.total };
+}
+
 export default { fetchAllTasks, groupIntoPlans, postTask, patchTask, deleteTask };

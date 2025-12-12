@@ -20,6 +20,17 @@ paths:
           schema:
             type: string
           description: Filter tasks by parent task id
+        - name: planId
+          in: query
+          schema:
+            type: string
+          description: Return the subtree of tasks for the given plan root task id. Use with `recursive=true` to include descendants.
+        - name: recursive
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: If true and `planId` is provided, return the plan root and all descendant tasks (subtree).
         - name: limit
           in: query
           schema:

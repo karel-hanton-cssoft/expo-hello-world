@@ -13,7 +13,12 @@ def on_startup():
 
 
 @app.get('/tasks')
-def list_tasks(parentId: Optional[str] = Query(None), limit: int = Query(100), offset: int = Query(0)):
+def list_tasks(parentId: Optional[str] = Query(None), planId: Optional[str] = Query(None), recursive: bool = Query(False), limit: int = Query(100), offset: int = Query(0)):
+    # Support for returning a plan subtree: GET /tasks?planId={planId}&recursive=true
+    if planId and recursive:
+        items = db.get_subtree(planId)
+        return {'items': items, 'total': len(items)}
+
     return db.list_tasks(limit=limit, offset=offset, parentId=parentId)
 
 

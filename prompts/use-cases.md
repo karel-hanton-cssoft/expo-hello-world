@@ -544,6 +544,347 @@ This document defines high-level user workflows for the Just Plan It application
 
 ---
 
+## UC-07: Application Startup (Initialized App) ✅
+
+**Status:** IMPLEMENTED
+
+**Actor:** Returning User
+
+**Precondition:** 
+- App has been launched before and initialized
+- AsyncStorage contains `app:defaultUser` with valid user profile
+- If AsyncStorage not contains `app:defaultUser`  → redirect to UC-01: First Launch
+
+**Main Flow:**
+1. User launches the application
+2. App shows loading indicator
+3. App checks initialization status:
+   - Reads `app:defaultUser` from AsyncStorage
+   - If `app:defaultUser` not exists in AsyncStorage → **Redirect to UC-01**
+   - If user profile is initialized → continue
+4. App loads plan list from AsyncStorage:
+   - Reads `app:plans` key (array of plan IDs: `[planId1, planId2, ...]`)
+   - If `app:plans` is empty or missing → go to step 8 (no plans scenario)
+5. For each plan ID in `app:plans`, app prepares Plan Screen metadata:
+   - Reads `plan:{planId}:accessKey` - Security key for plan access
+   - Reads `plan:{planId}:meUserId` - User ID representing current user in plan.users
+   - Creates screen object:
+     ```typescript
+     {
+       type: 'plan',
+       planId: string,                 // task.id of root plan task
+       accessKey: string,              // from AsyncStorage
+       meUserId: string,               // from AsyncStorage
+       lastUpdateTimestamp: 0,         // never refreshed yet
+       taskMap: Map<string, Task>(),   // no tasks loaded yet (Map for fast lookup)
+       isRefreshing: false,            // no refresh in progress initially
+     }
+     ```
+   - **Note:** No server fetch happens at this stage (performance optimization)
+6. App adds "Create Plan Screen" as the last screen in navigation
+7. App displays default screen:
+   - If `plans.length > 0`:
+     - Shows first Plan Screen (index 0)
+     - Plan Screen triggers lazy load (see UC-08)
+   - If `plans.length === 0`:
+     - Shows "Create Plan Screen"
+     - User can create their first plan
+8. App is ready for user interaction:
+   - User can swipe between screens
+   - User can access global menu (☰)
+   - Plan data loads on demand when screen is displayed (UC-08)
+
+**Alternative Flow A: No plans in AsyncStorage**
+
+*Trigger: Step 4 - `app:plans` is empty array or not present*
+
+1. System creates empty plans array
+2. Shows "Create Plan Screen" as the only screen
+3. User can create their first plan (UC-03)
+
+**Alternative Flow B: AsyncStorage corrupted or unreadable**
+
+*Trigger: Step 4 - AsyncStorage read fails*
+
+1. System logs error to console
+2. For individual plan metadata errors:
+   - If `plan:{planId}:accessKey` missing → skip plan, log warning
+   - If `plan:{planId}:meUserId` missing → skip plan, log warning
+   - Continue loading remaining plans
+3. If critical data missing (`app:plans` or `app:defaultUser` corrupted):
+   - Shows error Alert: "Failed to load data. Try clearing app data."
+   - Offers "Open Settings" button → opens AboutDialog
+   - User can use "Clear All App Data" button
+4. After clearing → restart app → UC-01 (first launch flow)
+
+**Success Criteria:**
+- [x] App checks initialization before loading plans
+- [x] Plan list loaded exclusively from AsyncStorage (not server)
+- [x] No server requests during startup (fast launch)
+- [x] Plan Screens prepared with metadata only (tasks not loaded)
+- [x] Each Plan Screen has `lastUpdateTimestamp = 0`
+- [x] First Plan Screen or Create Plan Screen displayed
+- [x] User can swipe between screens immediately
+- [x] Task data loading deferred to UC-08 (lazy loading)
+
+**Error Cases:**
+- **AsyncStorage unavailable:** Show error "Storage not available", offer Clear Data
+- **Corrupted plan data:** Skip corrupted plans, log warnings, continue with valid plans
+- **No plans found:** Show Create Plan Screen (not an error)
+
+**Technical Notes:**
+- **AsyncStorage Keys Used:**
+  ```typescript
+  "app:defaultUser"              → User object (profile)
+  "app:plans"                    → string[] (array of plan IDs)
+  "plan:{planId}:accessKey"      → string (security key)
+  "plan:{planId}:meUserId"       → string (user ID in plan.users)
+  ```
+- **Screen State After Startup - Example:**
+  ```typescript
+  screens = [
+    {
+      type: 'plan',
+      planId: 'uuid-1',
+      accessKey: 'key-1',
+      meUserId: 'user-1',
+      lastUpdateTimestamp: 0,
+      taskMap: Map<string, Task>(),
+      isRefreshing: false,
+    },
+    {
+      type: 'plan',
+      planId: 'uuid-2',
+      accessKey: 'key-2',
+      meUserId: 'user-2',
+      lastUpdateTimestamp: 0,
+      taskMap: Map<string, Task>(),
+      isRefreshing: false,
+    },
+    {
+      type: 'create',
+    },
+  ];
+  currentIndex = 0; // First Plan Screen
+  ```
+- **Performance:**
+  - Fast startup: No network requests during launch
+  - Lazy loading: Tasks fetched only when screen is viewed (UC-08)
+  - Cached metadata: AsyncStorage reads are fast and synchronous
+- **Related Files:**
+  - `client/src/App.tsx` - Main app component with startup logic
+  - `client/src/storage/app.ts` - AsyncStorage helpers (getPlans, getPlan)
+
+---
+
+## UC-08: Display Plan Screen (Lazy Load & Refresh) ✅
+
+**Status:** IMPLEMENTED
+
+**Actor:** User
+
+**Precondition:**
+- App is running and initialized (UC-07 completed)
+- Plan Screen exists with metadata:
+  - `planId` (task.id of root plan task)
+  - `accessKey` (security key)
+  - `meUserId` (current user's ID in plan.users)
+  - `lastUpdateTimestamp` (timestamp of last refresh, initially 0)
+  - `taskMap` (Map<string, Task> keyed by taskId, initially empty)
+  - `isRefreshing` (boolean flag, initially false)
+
+**Main Flow:**
+1. Plan Screen becomes visible:
+   - **Trigger A:** App startup shows first Plan Screen (from UC-07)
+   - **Trigger B:** User swipes to Plan Screen
+   - **Trigger C:** User returns to app from background
+2. System checks if refresh is needed:
+   - Gets current time: `now = Date.now()`
+   - Gets screen's `lastUpdateTimestamp`
+   - Gets `refreshTimeout` from app settings (default: `10000` ms = 10 seconds)
+   - Calculates: `shouldRefresh = (now - lastUpdateTimestamp) > refreshTimeout`
+3. System decides on refresh:
+   - **If `shouldRefresh === true`** → continue to step 4 (fetch from server)
+   - **If `shouldRefresh === false`** → skip to step 7 (use cached data)
+4. System fetches plan data from server using the existing `/tasks` endpoint with recursive option:
+   - Sets `screen.isRefreshing = true`
+   - Shows subtle loading indicator: small ActivityIndicator in plan header (right side), light color, doesn't block swipe gestures
+   - Calls `GET /tasks?planId={planId}&recursive=true` which returns the root plan task and all its descendant tasks in one response.
+   - Server behaviour:
+     - Accepts the plan root task id (`planId`) and recursively resolves all tasks whose `parentId` is the plan or any descendant.
+     - Returns a JSON object `{ items: [ ...tasks ], total: N }` where `items` contains the root plan and all descendant tasks (order is unspecified; client may reorder as needed).
+   - Client then converts the returned task list into the per-screen `taskMap` (map of `taskId -> Task`).
+5. System updates screen state:
+  - Populates `screen.taskMap` with fetched tasks (Map keyed by `taskId`)
+  - Sets `screen.lastUpdateTimestamp = Date.now()`
+  - Sets `screen.isRefreshing = false`
+  - **Data merge strategy** (handles conflicts between server and local data):
+     - **Plan-level fields:** Server data wins (title, description, status, subtaskIds, etc.)
+     - **accessKey:** Always from AsyncStorage (never overwritten by server)
+     - **users dictionary:** Merge both sources (local additions + server users preserved)
+     - **Task fields:** Server data takes precedence (assumes server is source of truth)
+     - **Conflict resolution:** Last-write-wins based on `updatedAt` timestamp (server typically newer)
+     - **Local-only changes:** If task has unsaved local edits (pending sync), preserve those until sync completes
+6. System renders Plan Screen:
+   - Shows plan header with title and assignee pill
+   - Renders task list from `taskMap` (root tasks + subtasks recursively using TaskItem)
+   - Shows "Add Task" button
+   - Shows Plan Context Menu (⋮) if plan is valid
+   - Hides loading indicator (ActivityIndicator removed)
+   - If `taskMap` is empty after successful fetch: shows empty state "No tasks yet. Tap + to add first task"
+7. Screen is ready for user interaction:
+   - User can view tasks from `taskMap`
+   - User can add/edit/delete tasks (UC-04, UC-05, UC-06)
+   - User can manage plan users (Plan Context Menu → Users)
+   - **Local changes behavior:**
+     - Add/edit/delete operations update `taskMap` immediately (optimistic update)
+     - Changes trigger server sync in background (POST/PATCH/DELETE)
+     - `lastUpdateTimestamp` is NOT updated on local changes (allows next refresh to detect remote changes)
+     - Refresh will merge local pending changes with server data (local unsaved edits preserved)
+
+**Alternative Flow A: Server fetch fails (no network)**
+
+*Trigger: Step 4 - API call fails (network error, timeout)*
+
+1. System logs error to console
+2. If `screen.taskMap` has cached entries (map size > 0):
+  - Shows cached data from `taskMap`
+  - Displays warning banner: "⚠️ Using offline data"
+  - Sets `lastUpdateTimestamp = Date.now()` (retry after timeout)
+3. If `screen.taskMap` is empty (no cached data):
+  - Shows empty state: "📡 Cannot load plan (offline)"
+  - Offers "Retry" button
+  - User can tap retry to attempt refresh again (returns to step 4)
+
+**Alternative Flow B: Plan not found on server (deleted remotely)**
+
+*Trigger: Step 4 - Server returns 404 or plan ID not in task list*
+
+1. System shows Alert: "Plan Not Found"
+   - Message: "This plan no longer exists on the server"
+2. Offers options:
+   - **Remove from My Plans**: Removes plan ID from AsyncStorage
+   - **Keep Local Data**: Keeps plan in list (offline mode, cached data only)
+3. If user chooses "Remove":
+   - Calls `removePlan(planId)` to delete from AsyncStorage
+   - Navigates to next screen or Create Plan Screen
+   - Updates screen list (removes plan from navigation)
+
+**Alternative Flow C: Refresh already in progress**
+
+*Trigger: Step 2 - Another refresh is already running (screen.isRefreshing === true)*
+
+1. System skips new refresh request (avoids duplicate concurrent requests)
+2. Shows current loading indicator (from ongoing refresh)
+3. User sees cached data from `taskMap` during refresh
+4. When ongoing refresh completes, UI updates with new data
+
+**Implementation note:**
+```typescript
+if (screen.isRefreshing) {
+  // Don't start another refresh, existing one will complete
+  return;
+}
+```
+
+**Success Criteria:**
+- [x] First display always refreshes (lastUpdateTimestamp = 0)
+- [x] Subsequent displays check refresh timeout before fetching
+- [x] Cached data used if within timeout period (fast navigation)
+- [x] Refresh timeout is configurable (default 10 seconds)
+- [x] Loading indicator shown during refresh (subtle, non-blocking)
+- [x] Offline mode: cached data displayed with warning banner
+- [x] Local changes (users, accessKey) preserved during merge
+- [x] Failed refresh doesn't prevent using cached data
+- [x] Background/foreground transitions trigger refresh check
+
+**Error Cases:**
+- **Network timeout:** Use cached data, show offline banner, retry after timeout
+- **Server error (500):** Use cached data, show error banner, retry after timeout
+- **Invalid response:** Log error, use cached data, show error banner
+- **No cached data + offline:** Show empty state with retry button
+
+**Technical Notes:**
+- **Refresh Timeout Configuration:**
+  ```typescript
+  const APP_SETTINGS = {
+    refreshTimeout: 10000, // 10 seconds (milliseconds)
+  };
+  
+  const shouldRefresh = (Date.now() - lastUpdateTimestamp) > APP_SETTINGS.refreshTimeout;
+  ```
+**API Call (recommended server support):**
+  ```typescript
+  // Use the existing /tasks endpoint with recursive option to return plan + descendants
+  // Example: GET /tasks?planId={planId}&recursive=true
+  const response = await fetch(`${SERVER}/tasks?planId=${planId}&recursive=true`);
+  if (!response.ok) throw new Error(`Failed to fetch plan tasks: ${response.status}`);
+  const result = await response.json();
+  // result.items is an array containing the root plan task and all descendant tasks
+  const planTasks = result.items as Task[];
+
+  // Build taskMap (cache) for the screen
+  const taskMap = new Map<string, Task>();
+  planTasks.forEach(t => taskMap.set(t.id, t));
+  // Assign into screen.taskMap
+  screen.taskMap = taskMap;
+  ```
+- **Data Merge Strategy:**
+  ```typescript
+  // Merge server data with local data
+  const mergedPlan = {
+    ...serverPlan,              // Server data (tasks, title, description, etc.)
+    users: {
+      ...serverPlan.users,      // Server users
+      ...localPlan.users,       // Local additions (preserved)
+    },
+    accessKey: localPlan.accessKey, // Always from AsyncStorage
+  };
+  ```
+- **Screen State:**
+  ```typescript
+  interface PlanScreenState {
+    planId: string;
+    accessKey: string;
+    meUserId: string;
+    lastUpdateTimestamp: number;   // Unix timestamp (ms)
+    taskMap: Map<string, Task>;  // Cached tasks
+    isRefreshing: boolean;         // Refresh in progress flag
+  }
+  ```
+- **Performance Optimization:**
+  - **Lazy loading:** Only load data when screen is visible
+  - **Caching:** Use cached data within timeout period
+  - **Debouncing:** Prevent multiple simultaneous refreshes (via isRefreshing flag)
+  - **Non-blocking UI:** Subtle loading indicator, don't block interaction
+- **React Native Lifecycle Hooks:**
+  ```typescript
+  // Detect when screen becomes visible (swipe navigation)
+  import { useFocusEffect } from '@react-navigation/native';
+  
+  useFocusEffect(
+    useCallback(() => {
+      checkAndRefreshIfNeeded();
+    }, [planId])
+  );
+  
+  // Detect app returning from background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkAndRefreshIfNeeded();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+  ```
+- **Related Files:**
+  - `client/src/App.tsx` - Screen rendering, navigation, refresh logic
+  - `client/src/api.ts` - Server API calls (fetchAllTasks)
+  - `client/src/storage/app.ts` - AsyncStorage helpers (getPlan)
+
+---
+
 ## Proposed Use Cases to Implement
 
 ### Core Functionality
@@ -553,59 +894,61 @@ This document defines high-level user workflows for the Just Plan It application
 - [x] **UC-04: Add Task to Plan** *(completed)*
 - [x] **UC-05: Edit Plan or Task** *(completed)*
 - [x] **UC-06: Delete Plan or Task** *(completed)*
+- [x] **UC-07: Application Startup (Initialized App)** *(completed)*
+- [x] **UC-08: Display Plan Screen (Lazy Load & Refresh)** *(completed)*
 
-- [ ] **UC-07: Update Task Status**
+- [ ] **UC-09: Update Task Status**
   - User marks task as done/in-progress/blocked
   - Status synced
   - Other participants see updates
 
 ### Collaboration
-- [ ] **UC-08: Share Plan via Access Key**
+- [ ] **UC-10: Share Plan via Access Key**
   - User views accessKey for plan
   - Copy to clipboard or share via system share sheet
   - Recipient can use key to join
 
-- [ ] **UC-09: Join Existing Plan**
+- [ ] **UC-11: Join Existing Plan**
   - User receives accessKey (link, QR code, or manual entry)
   - User enters key in app
   - App fetches plan from server
   - User selects or creates their identity in plan
 
-- [ ] **UC-10: Add Participant to Plan**
+- [ ] **UC-12: Add Participant to Plan**
   - User adds new user to Plan.users
   - New user available for task assignment
   - Synced to server
 
-- [ ] **UC-11: Change "Me" User in Plan**
+- [ ] **UC-13: Change "Me" User in Plan**
   - User switches which participant represents them
   - Local meUserId updated
   - UI updates to show correct "assigned to me" tasks
 
 ### Data Management
-- [ ] **UC-12: Refresh Plan Data**
+- [ ] **UC-14: Refresh Plan Data**
   - User pulls to refresh
   - App fetches latest tasks from server
   - Local data updated
   - Conflicts resolved (last-write-wins)
 
-- [ ] **UC-13: Offline Plan Creation**
+- [ ] **UC-15: Offline Plan Creation**
   - User creates plan while offline
   - Plan saved locally
   - App queues sync operation
   - Auto-syncs when connection restored
 
-- [ ] **UC-14: Remove Plan from App**
+- [ ] **UC-16: Remove Plan from App**
   - User removes plan from local list
   - Plan data removed from AsyncStorage
   - Server data unaffected (plan still exists)
 
 ### Settings & Profile
-- [ ] **UC-15: Edit Default User Profile**
+- [ ] **UC-17: Edit Default User Profile**
   - User updates their default profile
   - Used for new plans going forward
   - Existing plans unaffected
 
-- [ ] **UC-16: Clear All App Data**
+- [ ] **UC-18: Clear All App Data**
   - Developer/tester clears all local data
   - Fresh start without reinstalling
   - Confirmation required
@@ -613,15 +956,15 @@ This document defines high-level user workflows for the Just Plan It application
 ---
 
 ## Notes for Implementation
-- UC-01 through UC-06 completed (core CRUD operations)
-- UC-08, UC-09 (collaboration via accessKey) are critical for multi-user features
-- UC-13 (offline) can be deferred if complex
-- UC-16 is dev-only, low priority for MVP
+- UC-01 through UC-08 completed (core CRUD + startup/display)
+- UC-10, UC-11 (collaboration via accessKey) are critical for multi-user features
+- UC-15 (offline) can be deferred if complex
+- UC-18 is dev-only, already implemented in AboutDialog
 
 ---
 
 ## Next Steps
-1. ✅ Completed UC-01 through UC-06 (Plans, Tasks CRUD)
-2. Next priority: UC-08, UC-09 (Collaboration features)
-3. Consider UC-07 (Task Status) for workflow management
+1. ✅ Completed UC-01 through UC-08 (Plans, Tasks CRUD, Startup, Display)
+2. Next priority: UC-10, UC-11 (Collaboration features)
+3. Consider UC-09 (Task Status) for workflow management
 4. Use use cases to drive further technical design

@@ -25,14 +25,19 @@ import AboutDialog from './components/AboutDialog';
 import UserDialog from './components/UserDialog';
 import PlanUsersDialog from './components/PlanUsersDialog';
 
-type ExamplePlan = { plan: Plan; tasks: Task[] };
+type ExamplePlan = { 
+  plan: Plan; 
+  tasks: Task[];
+  lastUpdateTimestamp: number;  // Unix timestamp of last refresh
+  isRefreshing: boolean;         // Refresh in progress flag
+};
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
 export default function App() {
   const [selected, setSelected] = useState<ExamplePlan | null>(null);
-  const [plans, setPlans] = useState<ExamplePlan[]>(EXAMPLE_PLANS as ExamplePlan[]);
+  const [plans, setPlans] = useState<ExamplePlan[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -435,6 +440,7 @@ export default function App() {
           setPlans(prev => prev.map(p => {
             if (p.plan.id === parentPlan.plan.id) {
               return {
+                ...p,
                 plan: p.plan.id === taskParentId 
                   ? { ...p.plan, subtaskIds: updatedSubtaskIds }
                   : p.plan,
@@ -474,6 +480,8 @@ export default function App() {
       const newExamplePlan: ExamplePlan = {
         plan: newPlan,
         tasks: [],
+        lastUpdateTimestamp: Date.now(), // Just created
+        isRefreshing: false,
       };
       setPlans(prev => [...prev, newExamplePlan]);
 
@@ -518,6 +526,7 @@ export default function App() {
     }
   };
 
+  // UC-07: Application Startup - metadata-only load
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -525,12 +534,45 @@ export default function App() {
       await checkFirstLaunch();
       
       try {
-        const tasks = await api.fetchAllTasks(1000);
-        const grouped = api.groupIntoPlans(tasks);
-        if (mounted) setPlans(grouped as ExamplePlan[]);
+        // Load plan IDs from AsyncStorage (metadata only)
+        const { getPlans } = await import('./storage/app');
+        const planIds = await getPlans();
+        
+        if (planIds.length === 0) {
+          // No plans - show Create Plan Screen
+          console.log('No plans in AsyncStorage');
+          if (mounted) {
+            setPlans([]);
+            setLoading(false);
+          }
+          return;
+        }
+        
+        // Prepare empty ExamplePlan structures (tasks will be loaded on demand)
+        const emptyPlans: ExamplePlan[] = planIds.map(planId => ({
+          plan: {
+            id: planId,
+            title: 'Loading...',
+            status: 'new',
+            authorId: '',
+            subtaskIds: [],
+            createdAt: new Date().toISOString(),
+            users: {},
+            accessKey: '',
+          } as Plan,
+          tasks: [],
+          lastUpdateTimestamp: 0, // Never refreshed yet
+          isRefreshing: false,
+        }));
+        
+        if (mounted) {
+          setPlans(emptyPlans);
+          console.log(`Prepared ${emptyPlans.length} plan screens (tasks not loaded yet)`);
+        }
       } catch (err: any) {
-        console.warn('Failed to fetch remote tasks, falling back to examples', err);
+        console.error('Failed to load plans from AsyncStorage:', err);
         setError(String(err?.message || err));
+        if (mounted) setPlans([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -547,8 +589,125 @@ export default function App() {
     }
   }, [currentIndex]);
 
+  // UC-08: Refresh plan data when screen becomes visible
+  const refreshPlan = async (planIndex: number) => {
+    if (planIndex < 0 || planIndex >= plans.length) return;
+    const plan = plans[planIndex];
+    
+    // Check if refresh is needed (timeout: 10 seconds)
+    const now = Date.now();
+    const refreshTimeout = 10000; // 10 seconds
+    const shouldRefresh = (now - plan.lastUpdateTimestamp) > refreshTimeout;
+    
+    if (!shouldRefresh) {
+      console.log(`Plan ${plan.plan.id} recently refreshed, skipping`);
+      return;
+    }
+    
+    // Check if already refreshing
+    if (plan.isRefreshing) {
+      console.log(`Plan ${plan.plan.id} already refreshing, skipping`);
+      return;
+    }
+    
+    try {
+      // Set refreshing flag
+      setPlans(prev => prev.map((p, i) => 
+        i === planIndex ? { ...p, isRefreshing: true } : p
+      ));
+      
+      console.log(`Refreshing plan ${plan.plan.id}...`);
+      
+      // Fetch plan subtree from server
+      const result = await api.fetchPlanSubtree(plan.plan.id);
+      
+      if (result.items.length === 0) {
+        console.warn(`Plan ${plan.plan.id} not found on server`);
+        // Keep existing data, just update timestamp
+        setPlans(prev => prev.map((p, i) => 
+          i === planIndex ? { 
+            ...p, 
+            isRefreshing: false,
+            lastUpdateTimestamp: Date.now() 
+          } : p
+        ));
+        return;
+      }
+      
+      // Find the plan task (root)
+      const planTask = result.items.find(t => t.id === plan.plan.id);
+      if (!planTask) {
+        console.warn(`Plan task ${plan.plan.id} not in result`);
+        setPlans(prev => prev.map((p, i) => 
+          i === planIndex ? { 
+            ...p, 
+            isRefreshing: false,
+            lastUpdateTimestamp: Date.now() 
+          } : p
+        ));
+        return;
+      }
+      
+      // Get accessKey from AsyncStorage (never from server)
+      const { getPlan } = await import('./storage/app');
+      const planData = await getPlan(plan.plan.id);
+      const accessKey = planData?.accessKey || plan.plan.accessKey;
+      
+      // Merge plan with local accessKey
+      const mergedPlan = {
+        ...planTask,
+        accessKey: accessKey,
+        users: {
+          ...(planTask as Plan).users,
+          // Preserve any local-only user additions
+          ...plan.plan.users,
+        }
+      } as Plan;
+      
+      // Update state with refreshed data
+      setPlans(prev => prev.map((p, i) => 
+        i === planIndex ? {
+          plan: mergedPlan,
+          tasks: result.items,
+          lastUpdateTimestamp: Date.now(),
+          isRefreshing: false,
+        } : p
+      ));
+      
+      console.log(`Refreshed plan ${plan.plan.id}, loaded ${result.items.length} tasks`);
+      
+    } catch (err: any) {
+      console.error(`Failed to refresh plan ${plan.plan.id}:`, err);
+      // Keep existing data, update flags
+      setPlans(prev => prev.map((p, i) => 
+        i === planIndex ? { 
+          ...p, 
+          isRefreshing: false,
+          lastUpdateTimestamp: Date.now() // Set timestamp to prevent immediate retry
+        } : p
+      ));
+      
+      // Show offline banner if we have cached data
+      if (plan.tasks.length > 0) {
+        setError('Using offline data');
+      } else {
+        setError('Cannot load plan (offline)');
+      }
+    }
+  };
+
+  // Trigger refresh when currentIndex changes (user swipes to screen)
+  React.useEffect(() => {
+    if (loading) return; // Don't refresh during initial load
+    if (currentIndex >= plans.length) return; // Create Plan Screen
+    
+    // Refresh the currently visible plan
+    refreshPlan(currentIndex);
+  }, [currentIndex, loading]);
+
   // Create screens array: plans + Create Plan Screen
-  const screens = [...plans, { isCreateScreen: true }];
+  type ScreenItem = ExamplePlan | { isCreateScreen: true };
+  const screens: ScreenItem[] = [...plans, { isCreateScreen: true }];
 
   const renderScreen = ({ item, index }: { item: any; index: number }) => {
     if (item.isCreateScreen) {
@@ -724,7 +883,14 @@ export default function App() {
                 setPlans(mergedPlans);
               } catch (e: any) {
                 setError(String(e?.message || e));
-                setPlans(EXAMPLE_PLANS as ExamplePlan[]);
+                // Fallback to example plans with metadata
+                const fallbackPlans: ExamplePlan[] = EXAMPLE_PLANS.map((ex: any) => ({
+                  plan: ex.plan,
+                  tasks: ex.tasks,
+                  lastUpdateTimestamp: 0,
+                  isRefreshing: false,
+                }));
+                setPlans(fallbackPlans);
               } finally {
                 setLoading(false);
               }
@@ -750,12 +916,12 @@ export default function App() {
         )}
       </View>
 
-      <FlatList
+      <FlatList<ScreenItem>
         ref={flatListRef}
         data={screens}
         renderItem={renderScreen}
         keyExtractor={(item, index) =>
-          item.isCreateScreen ? 'create-screen' : item.plan.id
+          'isCreateScreen' in item && item.isCreateScreen ? 'create-screen' : (item as ExamplePlan).plan.id
         }
         horizontal
         pagingEnabled

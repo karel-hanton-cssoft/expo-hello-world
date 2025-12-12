@@ -59,3 +59,35 @@ def list_tasks(limit: int = 100, offset: int = 0, parentId: Optional[str] = None
         items = [json.loads(r['data']) for r in rows]
         total = c.execute('SELECT COUNT(1) FROM tasks').fetchone()[0]
         return {'items': items, 'total': total}
+
+
+def get_subtree(root_id: str):
+    """
+    Return a list of tasks containing the root task with id `root_id` and all its descendants.
+    Traverses `subtaskIds` arrays stored inside task JSON.
+    """
+    with connect() as c:
+        # helper to fetch a single task JSON by id
+        def fetch_task(tid: str):
+            r = c.execute('SELECT data FROM tasks WHERE id = ?', (tid,)).fetchone()
+            return json.loads(r['data']) if r else None
+
+        result = []
+        seen = set()
+
+        stack = [root_id]
+        while stack:
+            tid = stack.pop()
+            if tid in seen:
+                continue
+            t = fetch_task(tid)
+            if t is None:
+                continue
+            seen.add(tid)
+            result.append(t)
+            # enqueue children (if any)
+            for child_id in t.get('subtaskIds', []) or []:
+                if child_id not in seen:
+                    stack.append(child_id)
+
+        return result
