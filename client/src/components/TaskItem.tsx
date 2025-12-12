@@ -5,7 +5,6 @@ import { User } from '../models/user';
 
 export interface TaskItemProps {
   task: Task;
-  subtasks: Task[];
   allTasks: Map<string, Task>;
   planUsers: Record<string, User>;
   onAddSubtask: (parentTaskId: string) => void;
@@ -20,7 +19,6 @@ export interface TaskItemProps {
  */
 export default function TaskItem({
   task,
-  subtasks,
   allTasks,
   planUsers,
   onAddSubtask,
@@ -31,7 +29,9 @@ export default function TaskItem({
   const [expanded, setExpanded] = useState(true);
 
   // Get direct subtasks for this task
-  const directSubtasks = subtasks.filter(t => task.subtaskIds.includes(t.id));
+  const directSubtasks = Array.from(allTasks.values()).filter(t => 
+    task.subtaskIds?.includes(t.id)
+  );
 
   return (
     <View style={[styles.container, { marginLeft: level * 20 }]}>
@@ -112,26 +112,18 @@ export default function TaskItem({
         {/* Nested subtasks (recursive) */}
         {expanded && directSubtasks.length > 0 && (
           <View style={styles.subtasksContainer}>
-            {directSubtasks.map(subtask => {
-              // Get subtasks for this subtask
-              const nestedSubtasks = Array.from(allTasks.values()).filter(t =>
-                subtask.subtaskIds?.includes(t.id)
-              );
-              
-              return (
-                <TaskItem
-                  key={subtask.id}
-                  task={subtask}
-                  subtasks={nestedSubtasks}
-                  allTasks={allTasks}
-                  planUsers={planUsers}
-                  onAddSubtask={onAddSubtask}
-                  onViewDetails={onViewDetails}
-                  onDelete={onDelete}
-                  level={level + 1}
-                />
-              );
-            })}
+            {directSubtasks.map(subtask => (
+              <TaskItem
+                key={subtask.id}
+                task={subtask}
+                allTasks={allTasks}
+                planUsers={planUsers}
+                onAddSubtask={onAddSubtask}
+                onViewDetails={onViewDetails}
+                onDelete={onDelete}
+                level={level + 1}
+              />
+            ))}
           </View>
         )}
       </View>

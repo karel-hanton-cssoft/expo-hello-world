@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Text,
   View,
@@ -21,16 +21,11 @@ import { createNewTask } from './models/task';
 import { getDefaultUser, generateAccessKey, addPlan, getMeUserId, removePlan, saveDefaultUser } from './storage/app';
 import { TaskDialog } from './components/TaskDialog';
 import TaskItem from './components/TaskItem';
+import PlanItem from './components/PlanItem';
+import PlanScreen, { ExamplePlan } from './components/PlanScreen';
 import AboutDialog from './components/AboutDialog';
 import UserDialog from './components/UserDialog';
 import PlanUsersDialog from './components/PlanUsersDialog';
-
-type ExamplePlan = { 
-  plan: Plan; 
-  tasks: Task[];
-  lastUpdateTimestamp: number;  // Unix timestamp of last refresh
-  isRefreshing: boolean;         // Refresh in progress flag
-};
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
@@ -41,12 +36,8 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [showDialog, setShowDialog] = useState<boolean>(false);
-  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
-  const [dialogType, setDialogType] = useState<'task' | 'plan'>('task');
-  const [taskParentId, setTaskParentId] = useState<string | null>(null);
-  const [editTaskId, setEditTaskId] = useState<string | null>(null);
-  const [dialogInitialValues, setDialogInitialValues] = useState<{title?: string; description?: string; assigneeId?: string} | undefined>(undefined);
+  const [showPlanDialog, setShowPlanDialog] = useState<boolean>(false);
+  const [planDialogInitialValues, setPlanDialogInitialValues] = useState<{title?: string; description?: string} | undefined>(undefined);
   const [defaultUserForDialog, setDefaultUserForDialog] = useState<Record<string, User>>({});
   const [menuVisible, setMenuVisible] = useState<boolean>(false);
   const [showAboutDialog, setShowAboutDialog] = useState<boolean>(false);
@@ -163,8 +154,16 @@ export default function App() {
     setShowPlanUsersDialog(true);
   };
 
-  const handlePlanUpdate = (updatedPlan: Plan) => {
-    // Update plan in plans array
+  const handlePlanUpdate = (planId: string, updatedData: Partial<ExamplePlan>) => {
+    setPlans(prevPlans => 
+      prevPlans.map(p => 
+        p.plan.id === planId ? { ...p, ...updatedData } : p
+      )
+    );
+  };
+
+  const handlePlanUpdateFromDialog = (updatedPlan: Plan) => {
+    // Called from PlanUsersDialog - update only the plan object
     setPlans(prevPlans => 
       prevPlans.map(p => 
         p.plan.id === updatedPlan.id ? { ...p, plan: updatedPlan } : p
@@ -173,11 +172,7 @@ export default function App() {
   };
 
   const openCreatePlanDialog = async () => {
-    setDialogMode('create');
-    setDialogType('plan');
-    setTaskParentId(null);
-    setEditTaskId(null);
-    setDialogInitialValues(undefined);
+    setPlanDialogInitialValues(undefined);
     
     // Load default user for assignee selection
     try {
@@ -189,84 +184,28 @@ export default function App() {
       setDefaultUserForDialog({});
     }
     
-    setShowDialog(true);
+    setShowPlanDialog(true);
   };
 
-  const openCreateTaskDialog = (parentId: string) => {
-    setDialogMode('create');
-    setDialogType('task');
-    setTaskParentId(parentId);
-    setEditTaskId(null);
-    setDialogInitialValues(undefined);
-    setShowDialog(true);
-  };
-
-  const openEditDialog = (taskOrPlan: Task | Plan, type: 'task' | 'plan') => {
-    setDialogMode('edit');
-    setDialogType(type);
-    setEditTaskId(taskOrPlan.id);
-    setTaskParentId(null);
-    setDialogInitialValues({
-      title: taskOrPlan.title,
-      description: taskOrPlan.description,
-      assigneeId: 'assigneeId' in taskOrPlan ? taskOrPlan.assigneeId : undefined,
-    });
-    setShowDialog(true);
-  };
-
-  const closeDialog = () => {
-    setShowDialog(false);
-    setDialogMode('create');
-    setDialogType('task');
-    setTaskParentId(null);
-    setEditTaskId(null);
-    setDialogInitialValues(undefined);
+  const closePlanDialog = () => {
+    setShowPlanDialog(false);
+    setPlanDialogInitialValues(undefined);
     setDefaultUserForDialog({});
   };
 
-  /**
-   * Recursively collect all task IDs that should be deleted (task + all subtasks).
-   */
-  const collectTaskIdsToDelete = (taskId: string, allTasks: Map<string, Task>): string[] => {
-    const task = allTasks.get(taskId);
-    if (!task) return [taskId];
-
-    const ids = [taskId];
-    // Recursively collect subtask IDs
-    (task.subtaskIds || []).forEach(subtaskId => {
-      ids.push(...collectTaskIdsToDelete(subtaskId, allTasks));
-    });
-    return ids;
-  };
-
-  const handleDeleteTask = async (taskId: string, isPlan: boolean) => {
+  const handleDeletePlan = async (planId: string) => {
     try {
-      // Find the plan containing this task
-      const planData = plans.find(p => 
-        p.plan.id === taskId || p.tasks.some(t => t.id === taskId)
-      );
+      const planData = plans.find(p => p.plan.id === planId);
       if (!planData) {
-        Alert.alert('Error', 'Task not found');
+        Alert.alert('Error', 'Plan not found');
         return;
       }
 
-      // Build task map for recursive collection
-      const taskMap = new Map<string, Task>();
-      if (isPlan) {
-        taskMap.set(planData.plan.id, planData.plan);
-      }
-      planData.tasks.forEach(t => taskMap.set(t.id, t));
+      const taskCount = planData.taskMap.size + 1; // +1 for plan itself
 
-      // Collect all task IDs to delete (including subtasks recursively)
-      const idsToDelete = collectTaskIdsToDelete(taskId, taskMap);
-      const count = idsToDelete.length;
-
-      // Show confirmation dialog
       Alert.alert(
         'Delete Confirmation',
-        isPlan 
-          ? `Delete this plan and all ${count} task(s)? This cannot be undone.`
-          : `Delete this task and ${count === 1 ? 'no' : count - 1} subtask(s)? This cannot be undone.`,
+        `Delete this plan and all ${taskCount} task(s)? This cannot be undone.`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -274,63 +213,30 @@ export default function App() {
             style: 'destructive',
             onPress: async () => {
               try {
-                // Delete all tasks from server
-                await Promise.all(
-                  idsToDelete.map(id => 
-                    api.deleteTask(id).catch(err => {
-                      console.warn(`Failed to delete task ${id} from server:`, err);
-                    })
-                  )
-                );
+                // Delete plan + all tasks from server
+                await api.deleteTask(planId).catch(err => {
+                  console.warn(`Failed to delete plan ${planId} from server:`, err);
+                });
+                
+                // Delete plan from AsyncStorage
+                await removePlan(planId);
 
-                if (isPlan) {
-                  // Delete plan from AsyncStorage
-                  await removePlan(taskId);
+                // Remove plan from local state
+                setPlans(prev => prev.filter(p => p.plan.id !== planId));
 
-                  // Remove plan from local state
-                  setPlans(prev => prev.filter(p => p.plan.id !== taskId));
-
-                  // Navigate away from deleted plan
-                  setTimeout(() => {
-                    if (currentIndex > 0) {
-                      flatListRef.current?.scrollToIndex({
-                        index: Math.max(0, currentIndex - 1),
-                        animated: true,
-                      });
-                    }
-                  }, 100);
-                } else {
-                  // Delete task (not plan) - remove from parent's subtaskIds
-                  const task = taskMap.get(taskId);
-                  if (task && task.parentId) {
-                    const parent = taskMap.get(task.parentId);
-                    if (parent) {
-                      const updatedSubtaskIds = (parent.subtaskIds || []).filter(id => id !== taskId);
-                      await api.patchTask(parent.id, { subtaskIds: updatedSubtaskIds }).catch(err => {
-                        console.warn('Failed to update parent subtaskIds:', err);
-                      });
-                    }
+                // Navigate away from deleted plan
+                setTimeout(() => {
+                  if (currentIndex > 0) {
+                    flatListRef.current?.scrollToIndex({
+                      index: Math.max(0, currentIndex - 1),
+                      animated: true,
+                    });
                   }
+                }, 100);
 
-                  // Remove tasks from local state
-                  setPlans(prev => prev.map(p => {
-                    if (p.plan.id === planData.plan.id) {
-                      return {
-                        ...p,
-                        tasks: p.tasks.filter(t => !idsToDelete.includes(t.id)),
-                        plan: idsToDelete.includes(p.plan.id) ? p.plan : {
-                          ...p.plan,
-                          subtaskIds: (p.plan.subtaskIds || []).filter(id => id !== taskId)
-                        }
-                      };
-                    }
-                    return p;
-                  }));
-                }
-
-                Alert.alert('Success', `Deleted ${count} task(s)`);
+                Alert.alert('Success', `Deleted plan and ${taskCount} task(s)`);
               } catch (err: any) {
-                console.error('Failed to delete task:', err);
+                console.error('Failed to delete plan:', err);
                 Alert.alert('Error', 'Failed to delete: ' + (err.message || 'Unknown error'));
               }
             }
@@ -343,122 +249,29 @@ export default function App() {
     }
   };
 
-  const handleSaveTask = async (title: string, description?: string, assigneeId?: string) => {
+  const handleSavePlan = async (title: string, description?: string, assigneeId?: string) => {
     try {
-      if (dialogMode === 'edit') {
-        // Edit existing task/plan
-        if (!editTaskId) return;
-        
-        // Find the task/plan to edit
-        const planData = plans.find(p => 
-          p.plan.id === editTaskId || p.tasks.some(t => t.id === editTaskId)
+      // Create new plan
+      // Check for duplicate title
+      const existingTitles = plans.map(p => p.plan.title.toLowerCase());
+      if (existingTitles.includes(title.toLowerCase())) {
+        Alert.alert(
+          'Duplicate Title',
+          'Plan with this name exists. Continue?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Continue', 
+              onPress: () => performCreatePlan(title, description),
+            },
+          ]
         );
-        if (!planData) {
-          Alert.alert('Error', 'Task not found');
-          return;
-        }
-
-        // PATCH to server
-        const updates: Partial<Task> = { title, description };
-        if (assigneeId !== undefined) updates.assigneeId = assigneeId;
-        
-        await api.patchTask(editTaskId, updates);
-
-        // Update local state
-        setPlans(prev => prev.map(p => {
-          if (p.plan.id === editTaskId) {
-            return { ...p, plan: { ...p.plan, ...updates } };
-          }
-          if (p.tasks.some(t => t.id === editTaskId)) {
-            return {
-              ...p,
-              tasks: p.tasks.map(t => t.id === editTaskId ? { ...t, ...updates } : t)
-            };
-          }
-          return p;
-        }));
-
-        closeDialog();
-      } else if (dialogMode === 'create' && dialogType === 'plan') {
-        // Create new plan
-        // Check for duplicate title
-        const existingTitles = plans.map(p => p.plan.title.toLowerCase());
-        if (existingTitles.includes(title.toLowerCase())) {
-          Alert.alert(
-            'Duplicate Title',
-            'Plan with this name exists. Continue?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Continue', 
-                onPress: () => performCreatePlan(title, description),
-              },
-            ]
-          );
-          return;
-        }
-
-        await performCreatePlan(title, description);
-      } else if (dialogMode === 'create' && dialogType === 'task') {
-        // Create new task
-        if (!taskParentId) return;
-
-        const parentPlan = plans.find(p => 
-          p.plan.id === taskParentId || p.tasks.some(t => t.id === taskParentId)
-        );
-        if (!parentPlan) {
-          Alert.alert('Error', 'Parent not found');
-          return;
-        }
-
-        // Get meUserId from AsyncStorage
-        const meUserId = await getMeUserId(parentPlan.plan.id);
-        if (!meUserId) {
-          Alert.alert('Error', 'User ID not found');
-          return;
-        }
-
-        // Create new task
-        const newTask = createNewTask(taskParentId, meUserId);
-        newTask.title = title;
-        if (description) newTask.description = description;
-        if (assigneeId) newTask.assigneeId = assigneeId;
-
-        // POST to server
-        await api.postTask(newTask);
-
-        // Update parent's subtaskIds
-        const parent = taskParentId === parentPlan.plan.id 
-          ? parentPlan.plan 
-          : parentPlan.tasks.find(t => t.id === taskParentId);
-        
-        if (parent) {
-          const updatedSubtaskIds = [...(parent.subtaskIds || []), newTask.id];
-          await api.patchTask(parent.id, { subtaskIds: updatedSubtaskIds });
-
-          // Update local state
-          setPlans(prev => prev.map(p => {
-            if (p.plan.id === parentPlan.plan.id) {
-              return {
-                ...p,
-                plan: p.plan.id === taskParentId 
-                  ? { ...p.plan, subtaskIds: updatedSubtaskIds }
-                  : p.plan,
-                tasks: p.tasks.map(t => 
-                  t.id === taskParentId 
-                    ? { ...t, subtaskIds: updatedSubtaskIds }
-                    : t
-                ).concat(newTask)
-              };
-            }
-            return p;
-          }));
-        }
-
-        closeDialog();
+        return;
       }
+
+      await performCreatePlan(title, description);
     } catch (err: any) {
-      console.error('Failed to save task/plan', err);
+      console.error('Failed to save plan', err);
       Alert.alert('Error', 'Cannot save: ' + (err.message || 'Unknown error'));
     }
   };
@@ -479,14 +292,14 @@ export default function App() {
       // Add to local state
       const newExamplePlan: ExamplePlan = {
         plan: newPlan,
-        tasks: [],
+        taskMap: new Map<string, Task>(),
         lastUpdateTimestamp: Date.now(), // Just created
         isRefreshing: false,
       };
       setPlans(prev => [...prev, newExamplePlan]);
 
       // Close dialog
-      closeDialog();
+      closePlanDialog();
 
       // Navigate to new plan (last plan before Create Screen)
       setTimeout(() => {
@@ -504,25 +317,6 @@ export default function App() {
     } catch (err: any) {
       console.error('Failed to create plan', err);
       throw err;
-    }
-  };
-
-  const handleAddSubtask = (parentId: string) => {
-    openCreateTaskDialog(parentId);
-  };
-
-  const handleViewDetails = (taskId: string) => {
-    // Find the task
-    const planData = plans.find(p => 
-      p.tasks.some(t => t.id === taskId)
-    );
-    if (!planData) {
-      Alert.alert('Task Details', `Task ID: ${taskId}\nNot found`);
-      return;
-    }
-    const task = planData.tasks.find(t => t.id === taskId);
-    if (task) {
-      openEditDialog(task, 'task');
     }
   };
 
@@ -560,7 +354,7 @@ export default function App() {
             users: {},
             accessKey: '',
           } as Plan,
-          tasks: [],
+          taskMap: new Map<string, Task>(),
           lastUpdateTimestamp: 0, // Never refreshed yet
           isRefreshing: false,
         }));
@@ -589,122 +383,6 @@ export default function App() {
     }
   }, [currentIndex]);
 
-  // UC-08: Refresh plan data when screen becomes visible
-  const refreshPlan = async (planIndex: number) => {
-    if (planIndex < 0 || planIndex >= plans.length) return;
-    const plan = plans[planIndex];
-    
-    // Check if refresh is needed (timeout: 10 seconds)
-    const now = Date.now();
-    const refreshTimeout = 10000; // 10 seconds
-    const shouldRefresh = (now - plan.lastUpdateTimestamp) > refreshTimeout;
-    
-    if (!shouldRefresh) {
-      console.log(`Plan ${plan.plan.id} recently refreshed, skipping`);
-      return;
-    }
-    
-    // Check if already refreshing
-    if (plan.isRefreshing) {
-      console.log(`Plan ${plan.plan.id} already refreshing, skipping`);
-      return;
-    }
-    
-    try {
-      // Set refreshing flag
-      setPlans(prev => prev.map((p, i) => 
-        i === planIndex ? { ...p, isRefreshing: true } : p
-      ));
-      
-      console.log(`Refreshing plan ${plan.plan.id}...`);
-      
-      // Fetch plan subtree from server
-      const result = await api.fetchPlanSubtree(plan.plan.id);
-      
-      if (result.items.length === 0) {
-        console.warn(`Plan ${plan.plan.id} not found on server`);
-        // Keep existing data, just update timestamp
-        setPlans(prev => prev.map((p, i) => 
-          i === planIndex ? { 
-            ...p, 
-            isRefreshing: false,
-            lastUpdateTimestamp: Date.now() 
-          } : p
-        ));
-        return;
-      }
-      
-      // Find the plan task (root)
-      const planTask = result.items.find(t => t.id === plan.plan.id);
-      if (!planTask) {
-        console.warn(`Plan task ${plan.plan.id} not in result`);
-        setPlans(prev => prev.map((p, i) => 
-          i === planIndex ? { 
-            ...p, 
-            isRefreshing: false,
-            lastUpdateTimestamp: Date.now() 
-          } : p
-        ));
-        return;
-      }
-      
-      // Get accessKey from AsyncStorage (never from server)
-      const { getPlan } = await import('./storage/app');
-      const planData = await getPlan(plan.plan.id);
-      const accessKey = planData?.accessKey || plan.plan.accessKey;
-      
-      // Merge plan with local accessKey
-      const mergedPlan = {
-        ...planTask,
-        accessKey: accessKey,
-        users: {
-          ...(planTask as Plan).users,
-          // Preserve any local-only user additions
-          ...plan.plan.users,
-        }
-      } as Plan;
-      
-      // Update state with refreshed data
-      setPlans(prev => prev.map((p, i) => 
-        i === planIndex ? {
-          plan: mergedPlan,
-          tasks: result.items,
-          lastUpdateTimestamp: Date.now(),
-          isRefreshing: false,
-        } : p
-      ));
-      
-      console.log(`Refreshed plan ${plan.plan.id}, loaded ${result.items.length} tasks`);
-      
-    } catch (err: any) {
-      console.error(`Failed to refresh plan ${plan.plan.id}:`, err);
-      // Keep existing data, update flags
-      setPlans(prev => prev.map((p, i) => 
-        i === planIndex ? { 
-          ...p, 
-          isRefreshing: false,
-          lastUpdateTimestamp: Date.now() // Set timestamp to prevent immediate retry
-        } : p
-      ));
-      
-      // Show offline banner if we have cached data
-      if (plan.tasks.length > 0) {
-        setError('Using offline data');
-      } else {
-        setError('Cannot load plan (offline)');
-      }
-    }
-  };
-
-  // Trigger refresh when currentIndex changes (user swipes to screen)
-  React.useEffect(() => {
-    if (loading) return; // Don't refresh during initial load
-    if (currentIndex >= plans.length) return; // Create Plan Screen
-    
-    // Refresh the currently visible plan
-    refreshPlan(currentIndex);
-  }, [currentIndex, loading]);
-
   // Create screens array: plans + Create Plan Screen
   type ScreenItem = ExamplePlan | { isCreateScreen: true };
   const screens: ScreenItem[] = [...plans, { isCreateScreen: true }];
@@ -726,104 +404,17 @@ export default function App() {
     }
 
     // Plan Screen
-    const plan = item as ExamplePlan;
-    
-    // Build task lookup map
-    const taskMap = new Map<string, Task>();
-    plan.tasks.forEach(t => taskMap.set(t.id, t));
-    
-    // Find root tasks (direct children of plan)
-    const rootTasks = plan.tasks.filter(t => t.parentId === plan.plan.id);
-    
-    // Get subtasks for each root task
-    const subtasksMap = new Map<string, Task[]>();
-    plan.tasks.forEach(task => {
-      if (task.parentId && task.parentId !== plan.plan.id) {
-        const siblings = subtasksMap.get(task.parentId) || [];
-        siblings.push(task);
-        subtasksMap.set(task.parentId, siblings);
-      }
-    });
+    const planData = item as ExamplePlan;
     
     return (
-      <View style={[styles.screenContainer, { width: SCREEN_WIDTH }]}>
-        <ScrollView style={styles.planScreen}>
-          <View style={styles.planHeader}>
-            <View style={styles.planHeaderRow}>
-              <Text style={styles.planHeaderTitle}>{plan.plan.title}</Text>
-              <View style={styles.iconButtons}>
-                <Pressable 
-                  style={styles.editIcon}
-                  onPress={() => openEditDialog(plan.plan, 'plan')}
-                >
-                  <Text style={styles.editIconText}>✏️</Text>
-                </Pressable>
-                <Pressable 
-                  style={styles.deleteIcon}
-                  onPress={() => handleDeleteTask(plan.plan.id, true)}
-                >
-                  <Text style={styles.deleteIconText}>✕</Text>
-                </Pressable>
-              </View>
-            </View>
-            {plan.plan.description && (
-              <Text style={styles.planHeaderSubtitle}>{plan.plan.description}</Text>
-            )}
-            {/* Assignee Pill */}
-            <View style={styles.assigneePillContainer}>
-              {plan.plan.assigneeId && plan.plan.users && plan.plan.users[plan.plan.assigneeId] ? (
-                <View style={styles.assigneePill}>
-                  <Text style={styles.assigneePillText}>
-                    {plan.plan.users[plan.plan.assigneeId].displayName}
-                  </Text>
-                </View>
-              ) : (
-                <View style={[styles.assigneePill, styles.assigneePillUnassigned]}>
-                  <Text style={[styles.assigneePillText, styles.assigneePillTextUnassigned]}>
-                    Unassigned
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View style={{ height: 3, backgroundColor: '#007AFF', marginTop: 12 }} />
-          </View>
-          
-          <View style={styles.planActions}>
-            <Pressable
-              style={styles.planActionButton}
-              onPress={() => handleOpen(plan)}
-            >
-              <Text style={styles.planActionButtonText}>View Details</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.planActionButton, { backgroundColor: '#28a745' }]}
-              onPress={() => handleAddSubtask(plan.plan.id)}
-            >
-              <Text style={styles.planActionButtonText}>+ Add Task</Text>
-            </Pressable>
-          </View>
-          
-          <View style={styles.tasksContainer}>
-            {rootTasks.length === 0 ? (
-              <Text style={styles.emptyText}>No tasks yet. Add your first task!</Text>
-            ) : (
-              rootTasks.map(task => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  subtasks={subtasksMap.get(task.id) || []}
-                  allTasks={taskMap}
-                  planUsers={plan.plan.users || {}}
-                  onAddSubtask={handleAddSubtask}
-                  onViewDetails={handleViewDetails}
-                  onDelete={(taskId) => handleDeleteTask(taskId, false)}
-                  level={0}
-                />
-              ))
-            )}
-          </View>
-        </ScrollView>
-      </View>
+      <PlanScreen
+        planData={planData}
+        screenIndex={index}
+        isVisible={index === currentIndex}
+        onUpdatePlan={handlePlanUpdate}
+        onDeletePlan={handleDeletePlan}
+        onShowError={setError}
+      />
     );
   };
 
@@ -855,50 +446,6 @@ export default function App() {
           </Pressable>
           
           <Text style={styles.title}>Plans ({currentIndex + 1}/{screens.length})</Text>
-          <Pressable
-            onPress={async () => {
-              setLoading(true);
-              setError(null);
-              try {
-                const tasks = await api.fetchAllTasks(1000);
-                const grouped = api.groupIntoPlans(tasks) as ExamplePlan[];
-                
-                // Merge with existing plans to preserve users
-                const mergedPlans = grouped.map(newPlan => {
-                  const existingPlan = plans.find(p => p.plan.id === newPlan.plan.id);
-                  if (existingPlan && existingPlan.plan.users) {
-                    const hasUsers = newPlan.plan.users && Object.keys(newPlan.plan.users).length > 0;
-                    return {
-                      ...newPlan,
-                      plan: {
-                        ...newPlan.plan,
-                        users: hasUsers ? newPlan.plan.users : existingPlan.plan.users,
-                        accessKey: newPlan.plan.accessKey || existingPlan.plan.accessKey,
-                      }
-                    };
-                  }
-                  return newPlan;
-                });
-                
-                setPlans(mergedPlans);
-              } catch (e: any) {
-                setError(String(e?.message || e));
-                // Fallback to example plans with metadata
-                const fallbackPlans: ExamplePlan[] = EXAMPLE_PLANS.map((ex: any) => ({
-                  plan: ex.plan,
-                  tasks: ex.tasks,
-                  lastUpdateTimestamp: 0,
-                  isRefreshing: false,
-                }));
-                setPlans(fallbackPlans);
-              } finally {
-                setLoading(false);
-              }
-            }}
-            style={styles.refreshButton}
-          >
-            <Text style={styles.refreshText}>Refresh</Text>
-          </Pressable>
           
           {/* Plan Context Menu - pouze pokud je zobrazený validní plán */}
           {currentIndex < plans.length && !(screens[currentIndex] as any).isCreateScreen && (
@@ -935,6 +482,10 @@ export default function App() {
           offset: SCREEN_WIDTH * index,
           index,
         })}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
+        removeClippedSubviews={true}
       />
 
       <Modal visible={!!selected} animationType="slide" onRequestClose={handleClose}>
@@ -953,28 +504,24 @@ export default function App() {
                 <Text style={styles.mono}>{JSON.stringify(selected.plan, null, 2)}</Text>
               </View>
 
-              <Text style={styles.sectionTitle}>Tasks (tree)</Text>
-              <TaskTree plan={selected.plan} tasks={selected.tasks} />
+              <Text style={styles.sectionTitle}>Tasks (raw)</Text>
+              <View style={styles.jsonBox}>
+                <Text style={styles.mono}>{JSON.stringify(Array.from(selected.taskMap.values()), null, 2)}</Text>
+              </View>
             </ScrollView>
           </SafeAreaView>
         )}
       </Modal>
 
+      {/* Plan Dialog (Create Plan only) */}
       <TaskDialog
-        visible={showDialog}
-        mode={dialogMode}
-        type={dialogType}
-        users={
-          // Find users from the relevant plan
-          taskParentId 
-            ? plans.find(p => p.plan.id === taskParentId || p.tasks.some(t => t.id === taskParentId))?.plan.users || {}
-            : editTaskId
-              ? plans.find(p => p.plan.id === editTaskId || p.tasks.some(t => t.id === editTaskId))?.plan.users || {}
-              : defaultUserForDialog  // Use default user for Create Plan mode
-        }
-        initialValues={dialogInitialValues}
-        onCancel={closeDialog}
-        onSave={handleSaveTask}
+        visible={showPlanDialog}
+        mode="create"
+        type="plan"
+        users={defaultUserForDialog}
+        initialValues={planDialogInitialValues}
+        onCancel={closePlanDialog}
+        onSave={handleSavePlan}
       />
 
       {/* Global Menu */}
@@ -1044,61 +591,10 @@ export default function App() {
         <PlanUsersDialog
           visible={showPlanUsersDialog}
           plan={plans[currentIndex].plan}
-          tasks={plans[currentIndex].tasks}
+          tasks={Array.from(plans[currentIndex].taskMap.values())}
           onClose={() => setShowPlanUsersDialog(false)}
-          onUpdate={handlePlanUpdate}
+          onUpdate={handlePlanUpdateFromDialog}
         />
-      )}
-    </View>
-  );
-}
-
-function TaskTree({ plan, tasks }: { plan: Plan; tasks: Task[] }) {
-  // build quick lookup
-  const byId = useMemo(() => {
-    const m = new Map<string, Task>();
-    tasks.forEach((t) => m.set(t.id, t));
-    return m;
-  }, [tasks]);
-
-  // find roots (children of plan)
-  const roots = tasks.filter((t) => t.parentId === plan.id);
-
-  return (
-    <View style={{ paddingHorizontal: 12 }}>
-      {roots.map((r) => (
-        <TaskNode key={r.id} id={r.id} byId={byId} level={0} />
-      ))}
-    </View>
-  );
-}
-
-function TaskNode({ id, byId, level }: { id: string; byId: Map<string, Task>; level: number }) {
-  const task = byId.get(id)!;
-  const [open, setOpen] = useState<boolean>(false);
-  const children = task.subtaskIds ?? [];
-
-  return (
-    <View style={{ marginVertical: 8 }}>
-      <Pressable
-        onPress={() => setOpen((s) => !s)}
-        style={[styles.nodeRow, { paddingLeft: level * 14 }]}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        accessibilityRole="button"
-      >
-        <Text style={styles.nodeTitle}>{open ? '▾' : '▸'} {task.title}</Text>
-        <Text style={styles.nodeStatus}>{task.status}</Text>
-      </Pressable>
-      {open && (
-        <View>
-          <View style={{ paddingLeft: 14, paddingVertical: 6 }}>
-              <Text style={styles.nodeMeta}>id: {task.id}</Text>
-              {task.description ? <Text style={styles.nodeMeta}>{task.description}</Text> : null}
-            </View>
-          {children.map((c) => (
-            <TaskNode key={c} id={c} byId={byId} level={level + 1} />
-          ))}
-        </View>
       )}
     </View>
   );
@@ -1254,8 +750,6 @@ const styles = StyleSheet.create({
 
   screenContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
   // Create Plan Screen styles
@@ -1277,94 +771,6 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
 
-  // Plan Screen styles
-  planScreen: {
-    flex: 1,
-    width: '100%',
-    paddingTop: 156,
-    backgroundColor: '#fff'
-  },
-  planHeader: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    paddingBottom: 12
-  },
-  planHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  iconButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  editIcon: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  editIconText: {
-    fontSize: 24,
-  },
-  deleteIcon: {
-    padding: 4,
-    marginLeft: 4,
-  },
-  deleteIconText: {
-    fontSize: 28,
-    color: '#ff3b30',
-    fontWeight: '700',
-  },
-  planHeaderTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000',
-    flex: 1,
-  },
-  planHeaderSubtitle: {
-    fontSize: 16,
-    color: '#666'
-  },
-  planActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginHorizontal: 16,
-    marginBottom: 16
-  },
-  planActionButton: {
-    flex: 1,
-    backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  planActionButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  tasksContainer: {
-    flex: 1,
-    paddingHorizontal: 16
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 40
-  },
-  planButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  planButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700'
-  },
-
   // Modal styles
   modalContainer: { flex: 1, padding: 12, backgroundColor: '#fff' },
   modalHeader: { 
@@ -1383,40 +789,4 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '700', marginTop: 12, marginBottom: 6 },
   jsonBox: { backgroundColor: '#f5f5f5', padding: 8, borderRadius: 6, marginBottom: 16 },
   mono: { fontFamily: 'monospace', fontSize: 11, color: '#222' },
-  
-  // Task tree styles
-  nodeRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingVertical: 8, 
-    paddingRight: 8 
-  },
-  nodeTitle: { fontSize: 15, lineHeight: 20, flex: 1 },
-  nodeStatus: { fontSize: 12, color: '#666', marginLeft: 8 },
-  nodeMeta: { fontSize: 12, color: '#444', marginBottom: 4 },
-  
-  // Assignee pill styles
-  assigneePillContainer: {
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  assigneePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#007AFF',
-    alignSelf: 'flex-start',
-  },
-  assigneePillUnassigned: {
-    backgroundColor: '#f0f0f0',
-  },
-  assigneePillText: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: '600',
-  },
-  assigneePillTextUnassigned: {
-    color: '#666',
-  },
 });
