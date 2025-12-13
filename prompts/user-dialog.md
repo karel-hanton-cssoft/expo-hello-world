@@ -195,7 +195,7 @@ const openEditPlanUserDialog = (userId: string) => {
 **Save akce**:
 - Přidá/upraví uživatele v plan.users
 - Vygeneruje userId (např. 'user-{timestamp}')
-- Synchronizuje se serverem přes PATCH /plans/{id}
+- Synchronizuje se serverem přes PATCH /tasks/{id}
 
 
 ## State Management

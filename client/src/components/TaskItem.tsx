@@ -1,28 +1,53 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Task } from '../models/task';
 import { User } from '../models/user';
 
 export interface TaskItemProps {
   task: Task;
-  subtasks: Task[];
   allTasks: Map<string, Task>;
   planUsers: Record<string, User>;
+  isPlan?: boolean;              // Flag to indicate if this is a Plan (not a regular task)
+  isRefreshing?: boolean;        // Flag to show loading indicator (only for isPlan=true)
   onAddSubtask: (parentTaskId: string) => void;
   onViewDetails: (taskId: string) => void;
-  onDelete: (taskId: string) => void;
+  onDelete: (taskId: string) => void | Promise<void>;
   level?: number;
 }
 
 /**
  * Recursive Task UI component.
  * Displays task with title, description, and nested subtasks.
+ * Can also render a Plan (which extends Task) with isPlan={true}.
  */
+
+// Helper component for assignee pill
+function AssigneePill({ task, users }: { task: Task; users: Record<string, User> }) {
+  return (
+    <View style={styles.assigneePillContainer}>
+      {task.assigneeId && users && users[task.assigneeId] ? (
+        <View style={styles.assigneePill}>
+          <Text style={styles.assigneePillText}>
+            {users[task.assigneeId].displayName}
+          </Text>
+        </View>
+      ) : (
+        <View style={[styles.assigneePill, styles.assigneePillUnassigned]}>
+          <Text style={[styles.assigneePillText, styles.assigneePillTextUnassigned]}>
+            Unassigned
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function TaskItem({
   task,
-  subtasks,
   allTasks,
   planUsers,
+  isPlan = false,
+  isRefreshing = false,
   onAddSubtask,
   onViewDetails,
   onDelete,
@@ -31,12 +56,33 @@ export default function TaskItem({
   const [expanded, setExpanded] = useState(true);
 
   // Get direct subtasks for this task
-  const directSubtasks = subtasks.filter(t => task.subtaskIds.includes(t.id));
+  const directSubtasks = Array.from(allTasks.values()).filter(t => 
+    task.subtaskIds?.includes(t.id)
+  );
+
+  // Conditional styling based on isPlan
+  const containerStyle = isPlan 
+    ? [styles.container, styles.planContainer]
+    : [styles.container, { marginLeft: level * 20 }];
+  
+  const titleStyle = isPlan 
+    ? styles.planTitle
+    : styles.title;
+  
+  const buttonText = isPlan 
+    ? '+ Add Task'
+    : '+ SubTask';
 
   return (
-    <View style={[styles.container, { marginLeft: level * 20 }]}>
-      {/* Blue vertical line */}
-      <View style={styles.blueLine} />
+    <View style={containerStyle}>
+      {/* Blue line - vertical for task, horizontal for plan */}
+      {isPlan ? (
+        // Plan: no vertical line at start, will have horizontal line after header
+        null
+      ) : (
+        // Task: vertical blue line
+        <View style={styles.blueLine} />
+      )}
 
       {/* Task content */}
       <View style={styles.content}>
@@ -46,11 +92,19 @@ export default function TaskItem({
             onPress={() => setExpanded(!expanded)}
             style={{ flex: 1 }}
           >
-            <Text style={styles.title}>
+            <Text style={titleStyle}>
               {expanded ? '▼' : '▶'} {task.title}
             </Text>
           </TouchableOpacity>
           <View style={styles.iconButtons}>
+            {/* Loading indicator for plan refresh */}
+            {isPlan && isRefreshing && (
+              <ActivityIndicator 
+                size="small" 
+                color="#007AFF" 
+                style={{ marginRight: 8 }}
+              />
+            )}
             <TouchableOpacity
               style={styles.editIconButton}
               onPress={() => onViewDetails(task.id)}
@@ -67,28 +121,15 @@ export default function TaskItem({
         </View>
 
         {/* Assignee Pill */}
-        {expanded && (
-          <View style={styles.assigneePillContainer}>
-            {task.assigneeId && planUsers && planUsers[task.assigneeId] ? (
-              <View style={styles.assigneePill}>
-                <Text style={styles.assigneePillText}>
-                  {planUsers[task.assigneeId].displayName}
-                </Text>
-              </View>
-            ) : (
-              <View style={[styles.assigneePill, styles.assigneePillUnassigned]}>
-                <Text style={[styles.assigneePillText, styles.assigneePillTextUnassigned]}>
-                  Unassigned
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+        {expanded && <AssigneePill task={task} users={planUsers} />}
 
         {/* Description */}
         {task.description && expanded && (
           <Text style={styles.description}>{task.description}</Text>
         )}
+
+        {/* Horizontal blue line for plan */}
+        {isPlan && expanded && <View style={styles.horizontalBlueLine} />}
 
         {/* Action buttons */}
         {expanded && (
@@ -104,7 +145,7 @@ export default function TaskItem({
               style={styles.button}
               onPress={() => onAddSubtask(task.id)}
             >
-              <Text style={styles.buttonText}>+ SubTask</Text>
+              <Text style={styles.buttonText}>{buttonText}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -112,26 +153,18 @@ export default function TaskItem({
         {/* Nested subtasks (recursive) */}
         {expanded && directSubtasks.length > 0 && (
           <View style={styles.subtasksContainer}>
-            {directSubtasks.map(subtask => {
-              // Get subtasks for this subtask
-              const nestedSubtasks = Array.from(allTasks.values()).filter(t =>
-                subtask.subtaskIds?.includes(t.id)
-              );
-              
-              return (
-                <TaskItem
-                  key={subtask.id}
-                  task={subtask}
-                  subtasks={nestedSubtasks}
-                  allTasks={allTasks}
-                  planUsers={planUsers}
-                  onAddSubtask={onAddSubtask}
-                  onViewDetails={onViewDetails}
-                  onDelete={onDelete}
-                  level={level + 1}
-                />
-              );
-            })}
+            {directSubtasks.map(subtask => (
+              <TaskItem
+                key={subtask.id}
+                task={subtask}
+                allTasks={allTasks}
+                planUsers={planUsers}
+                onAddSubtask={onAddSubtask}
+                onViewDetails={onViewDetails}
+                onDelete={onDelete}
+                level={level + 1}
+              />
+            ))}
           </View>
         )}
       </View>
@@ -144,10 +177,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginVertical: 8,
   },
+  planContainer: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    marginLeft: 0,
+    marginVertical: 0,
+  },
   blueLine: {
     width: 3,
     backgroundColor: '#007AFF',
     marginRight: 12,
+  },
+  horizontalBlueLine: {
+    height: 3,
+    backgroundColor: '#007AFF',
+    marginTop: 12,
+    marginBottom: 0,
   },
   content: {
     flex: 1,
@@ -165,6 +210,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#000',
+    marginBottom: 4,
+  },
+  planTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
     marginBottom: 4,
   },
   editIconButton: {
