@@ -9,6 +9,7 @@ import { TaskDialog } from './TaskDialog';
 export interface PlanItemProps {
   plan: Plan;
   taskMap: Map<string, Task>;
+  isRefreshing?: boolean;        // Flag to show loading indicator in plan header
   onSaveTask: (taskId: string, title: string, description?: string, assigneeId?: string) => Promise<void>;
   onCreateTask: (parentId: string, title: string, description?: string, assigneeId?: string) => Promise<void>;
   onDeleteTask: (taskId: string) => Promise<void>;
@@ -22,6 +23,7 @@ export interface PlanItemProps {
 export default function PlanItem({
   plan,
   taskMap,
+  isRefreshing = false,
   onSaveTask,
   onCreateTask,
   onDeleteTask,
@@ -98,6 +100,7 @@ export default function PlanItem({
         allTasks={taskMap}
         planUsers={plan.users || {}}
         isPlan={true}
+        isRefreshing={isRefreshing}
         onAddSubtask={handleAddTask}
         onViewDetails={handleEditPlan}
         onDelete={() => onDeletePlan(plan.id)}

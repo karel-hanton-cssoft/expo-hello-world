@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Pressable, Text, Dimensions, Alert } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, Pressable, Text, Dimensions, Alert, AppState, AppStateStatus } from 'react-native';
 import { Plan } from '../models/plan';
 import { Task } from '../models/task';
 import { User } from '../models/user';
@@ -47,6 +47,7 @@ export default function PlanScreen({
 }: PlanScreenProps) {
   const [planMenuVisible, setPlanMenuVisible] = useState<boolean>(false);
   const [showPlanUsersDialog, setShowPlanUsersDialog] = useState<boolean>(false);
+  const appState = useRef<AppStateStatus>(AppState.currentState);
 
   // Auto-refresh when screen becomes visible
   useEffect(() => {
@@ -63,6 +64,37 @@ export default function PlanScreen({
       refreshPlan();
     }
   }, [isVisible]); // Trigger when visibility changes
+
+  // AppState listener - refresh when app returns from background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      // Check if app is returning to foreground
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        console.log(`App returned to foreground, checking refresh for screen ${screenIndex}`);
+        
+        // Only refresh if this screen is visible
+        if (isVisible) {
+          const shouldRefresh = 
+            planData.taskMap.size === 0 || 
+            (Date.now() - planData.lastUpdateTimestamp) > 10000;
+          
+          if (shouldRefresh && !planData.isRefreshing) {
+            console.log(`Screen ${screenIndex} triggered refresh on foreground`);
+            refreshPlan();
+          }
+        }
+      }
+      
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isVisible, planData.taskMap.size, planData.lastUpdateTimestamp, planData.isRefreshing]);
 
   const refreshPlan = async () => {
     // Check 10-second timeout
@@ -330,6 +362,7 @@ export default function PlanScreen({
       <PlanItem
         plan={planData.plan}
         taskMap={planData.taskMap}
+        isRefreshing={planData.isRefreshing}
         onSaveTask={handleSaveTaskFromPlanItem}
         onCreateTask={handleCreateTaskFromPlanItem}
         onDeleteTask={handleDeleteTask}

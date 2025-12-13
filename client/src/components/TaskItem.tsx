@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Task } from '../models/task';
 import { User } from '../models/user';
 
@@ -8,6 +8,7 @@ export interface TaskItemProps {
   allTasks: Map<string, Task>;
   planUsers: Record<string, User>;
   isPlan?: boolean;              // Flag to indicate if this is a Plan (not a regular task)
+  isRefreshing?: boolean;        // Flag to show loading indicator (only for isPlan=true)
   onAddSubtask: (parentTaskId: string) => void;
   onViewDetails: (taskId: string) => void;
   onDelete: (taskId: string) => void | Promise<void>;
@@ -46,6 +47,7 @@ export default function TaskItem({
   allTasks,
   planUsers,
   isPlan = false,
+  isRefreshing = false,
   onAddSubtask,
   onViewDetails,
   onDelete,
@@ -95,6 +97,14 @@ export default function TaskItem({
             </Text>
           </TouchableOpacity>
           <View style={styles.iconButtons}>
+            {/* Loading indicator for plan refresh */}
+            {isPlan && isRefreshing && (
+              <ActivityIndicator 
+                size="small" 
+                color="#007AFF" 
+                style={{ marginRight: 8 }}
+              />
+            )}
             <TouchableOpacity
               style={styles.editIconButton}
               onPress={() => onViewDetails(task.id)}
