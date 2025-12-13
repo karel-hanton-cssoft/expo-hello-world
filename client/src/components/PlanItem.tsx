@@ -32,6 +32,7 @@ export default function PlanItem({
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [taskParentId, setTaskParentId] = useState<string | null>(null);
   const [dialogInitialValues, setDialogInitialValues] = useState<{title?: string; description?: string; assigneeId?: string} | undefined>(undefined);
+  const [expanded, setExpanded] = useState<boolean>(true); // Collapse/expand state
 
   // Find root tasks (direct children of plan)
   const rootTasks = Array.from(taskMap.values()).filter(t => t.parentId === plan.id);
@@ -91,61 +92,21 @@ export default function PlanItem({
 
   return (
     <ScrollView style={styles.container}>
-      {/* Plan Header */}
-      <View style={styles.planHeader}>
-        <View style={styles.planHeaderRow}>
-          <Text style={styles.planHeaderTitle}>{plan.title}</Text>
-          <View style={styles.iconButtons}>
-            <Pressable 
-              style={styles.editIcon}
-              onPress={handleEditPlan}
-            >
-              <Text style={styles.editIconText}>✏️</Text>
-            </Pressable>
-            <Pressable 
-              style={styles.deleteIcon}
-              onPress={() => onDeletePlan(plan.id)}
-            >
-              <Text style={styles.deleteIconText}>✕</Text>
-            </Pressable>
-          </View>
-        </View>
-        {plan.description && (
-          <Text style={styles.planHeaderSubtitle}>{plan.description}</Text>
-        )}
-        
-        {/* Assignee Pill */}
-        <View style={styles.assigneePillContainer}>
-          {plan.assigneeId && plan.users && plan.users[plan.assigneeId] ? (
-            <View style={styles.assigneePill}>
-              <Text style={styles.assigneePillText}>
-                {plan.users[plan.assigneeId].displayName}
-              </Text>
-            </View>
-          ) : (
-            <View style={[styles.assigneePill, styles.assigneePillUnassigned]}>
-              <Text style={[styles.assigneePillText, styles.assigneePillTextUnassigned]}>
-                Unassigned
-              </Text>
-            </View>
-          )}
-        </View>
-        
-        <View style={styles.blueLine} />
-      </View>
-      
-      {/* Plan Actions */}
-      <View style={styles.planActions}>
-        <Pressable
-          style={[styles.planActionButton, { backgroundColor: '#28a745' }]}
-          onPress={() => handleAddTask(plan.id)}
-        >
-          <Text style={styles.planActionButtonText}>+ Add Task</Text>
-        </Pressable>
-      </View>
+      {/* Plan Header - rendered as TaskItem with isPlan={true} */}
+      <TaskItem
+        task={plan}
+        allTasks={taskMap}
+        planUsers={plan.users || {}}
+        isPlan={true}
+        onAddSubtask={handleAddTask}
+        onViewDetails={handleEditPlan}
+        onDelete={() => onDeletePlan(plan.id)}
+        level={0}
+      />
       
       {/* Tasks Container */}
-      <View style={styles.tasksContainer}>
+      {expanded && (
+        <View style={styles.tasksContainer}>
         {rootTasks.length === 0 ? (
           <Text style={styles.emptyText}>No tasks yet. Add your first task!</Text>
         ) : (
@@ -163,6 +124,7 @@ export default function PlanItem({
           ))
         )}
       </View>
+      )}
 
       {/* Task Dialog */}
       <TaskDialog
@@ -183,108 +145,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     paddingTop: 156,
-  },
-  
-  planHeader: {
-    padding: 16,
-    backgroundColor: '#f8f9fa',
-  },
-  
-  planHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  
-  planHeaderTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    flex: 1,
-    marginRight: 12,
-  },
-  
-  planHeaderSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-    lineHeight: 20,
-  },
-  
-  iconButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  
-  editIcon: {
-    padding: 4,
-  },
-  
-  editIconText: {
-    fontSize: 18,
-  },
-  
-  deleteIcon: {
-    padding: 4,
-  },
-  
-  deleteIconText: {
-    fontSize: 20,
-    color: '#dc3545',
-    fontWeight: '600',
-  },
-  
-  assigneePillContainer: {
-    marginTop: 8,
-  },
-  
-  assigneePill: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-  },
-  
-  assigneePillUnassigned: {
-    backgroundColor: '#e0e0e0',
-  },
-  
-  assigneePillText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  
-  assigneePillTextUnassigned: {
-    color: '#666',
-  },
-  
-  blueLine: {
-    height: 3,
-    backgroundColor: '#007AFF',
-    marginTop: 12,
-  },
-  
-  planActions: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  
-  planActionButton: {
-    flex: 1,
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  
-  planActionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   
   tasksContainer: {
